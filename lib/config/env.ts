@@ -20,7 +20,6 @@ export const REQUIRED_ENV_VARS = [
   'FIREBASE_ADMIN_PRIVATE_KEY',
   'GEMINI_API_KEY',
   'GOOGLE_MAPS_API_KEY',
-  'PORT',
 ] as const;
 
 export type RequiredEnvVar = (typeof REQUIRED_ENV_VARS)[number];
@@ -37,7 +36,6 @@ export interface EnvConfig {
   FIREBASE_ADMIN_PRIVATE_KEY: string;
   GEMINI_API_KEY: string;
   GOOGLE_MAPS_API_KEY: string;
-  PORT: string;
 }
 
 /**
@@ -96,7 +94,6 @@ export function validateEnv(options: ValidateEnvOptions = {}): EnvConfig | undef
     FIREBASE_ADMIN_PRIVATE_KEY: env.FIREBASE_ADMIN_PRIVATE_KEY!,
     GEMINI_API_KEY: env.GEMINI_API_KEY!,
     GOOGLE_MAPS_API_KEY: env.GOOGLE_MAPS_API_KEY!,
-    PORT: env.PORT!,
   };
 
   return config;
