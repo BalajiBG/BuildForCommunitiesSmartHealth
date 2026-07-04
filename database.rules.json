@@ -1,0 +1,48 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null || true",
+        ".write": "$uid === auth.uid && !newData.hasChild('role')"
+      }
+    },
+    "centres": {
+      "$centreId": {
+        ".read": true,
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'Centre_Staff' && root.child('users').child(auth.uid).child('centreId').val() === $centreId"
+      }
+    },
+    "medicines": {
+      "$centreId": {
+        ".read": true,
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'Centre_Staff' && root.child('users').child(auth.uid).child('centreId').val() === $centreId"
+      }
+    },
+    "footfall": {
+      "$centreId": {
+        ".read": true,
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'Centre_Staff' && root.child('users').child(auth.uid).child('centreId').val() === $centreId"
+      }
+    },
+    "attendance": {
+      "$centreId": {
+        ".read": true,
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'Centre_Staff' && root.child('users').child(auth.uid).child('centreId').val() === $centreId"
+      }
+    },
+    "districts": {
+      "$districtId": {
+        ".read": true
+      }
+    },
+    "alerts": {
+      "$districtId": {
+        ".read": true
+      }
+    },
+    "consumption": {
+      ".read": true,
+      ".write": "auth != null"
+    }
+  }
+}

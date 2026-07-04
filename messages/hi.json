@@ -1,0 +1,85 @@
+{
+  "navigation": {
+    "dashboard": "डैशबोर्ड",
+    "centres": "स्वास्थ्य केंद्र",
+    "insights": "AI अंतर्दृष्टि",
+    "assistant": "AI सहायक",
+    "contacts": "संपर्क",
+    "directives": "निर्देश",
+    "myCentre": "मेरा केंद्र",
+    "login": "लॉगिन",
+    "logout": "लॉगआउट"
+  },
+  "auth": {
+    "loginButton": "Google से साइन इन करें",
+    "errorNetwork": "नेटवर्क उपलब्ध नहीं है। कृपया पुनः प्रयास करें।",
+    "errorUnauthorized": "खाता अधिकृत नहीं है। अपने व्यवस्थापक से संपर्क करें।",
+    "errorPopupBlocked": "साइन-इन पॉपअप ब्लॉक किया गया। कृपया पॉपअप की अनुमति दें और पुनः प्रयास करें।",
+    "errorGeneric": "लॉगिन विफल। कृपया पुनः प्रयास करें।",
+    "unauthorized": "आप इस पृष्ठ तक पहुँचने के लिए अधिकृत नहीं हैं।"
+  },
+  "dashboard": {
+    "title": "जिला डैशबोर्ड",
+    "summaryBeds": "कुल उपलब्ध बिस्तर",
+    "summaryDoctors": "उपस्थित डॉक्टर",
+    "summaryFootfall": "आज की फुटफॉल",
+    "summaryStock": "स्टॉक अलर्ट",
+    "noData": "वर्तमान में कोई स्वास्थ्य केंद्र डेटा उपलब्ध नहीं है।",
+    "alertStockLow": "स्टॉक कम",
+    "alertFullCapacity": "पूर्ण क्षमता",
+    "alertUnderstaffed": "कर्मचारियों की कमी",
+    "alertUnderperforming": "अंडरपरफॉर्मिंग"
+  },
+  "stock": {
+    "medicineName": "दवा का नाम",
+    "quantity": "मात्रा",
+    "reorderLevel": "पुनः आदेश स्तर",
+    "expiry": "समाप्ति तिथि",
+    "statusGreen": "पर्याप्त",
+    "statusYellow": "कम स्टॉक",
+    "statusRed": "गंभीर"
+  },
+  "footfall": {
+    "dailyCount": "दैनिक रोगी संख्या",
+    "chartTitle": "7-दिन रोगी फुटफॉल",
+    "confirmationMessage": "फुटफॉल सफलतापूर्वक दर्ज की गई।"
+  },
+  "beds": {
+    "totalBeds": "कुल बिस्तर",
+    "availableBeds": "उपलब्ध बिस्तर",
+    "fullCapacityAlert": "इस केंद्र की बिस्तर क्षमता पूर्ण हो गई है।"
+  },
+  "doctors": {
+    "present": "उपस्थित डॉक्टर",
+    "assigned": "नियुक्त डॉक्टर",
+    "understaffedAlert": "इस केंद्र में कर्मचारियों की कमी है (50% से कम उपस्थिति)।"
+  },
+  "ai": {
+    "predictionsTitle": "स्टॉक-आउट पूर्वानुमान",
+    "redistributionTitle": "संसाधन पुनर्वितरण अनुशंसाएँ",
+    "loading": "AI अंतर्दृष्टि उत्पन्न हो रही है...",
+    "error": "AI सेवा वर्तमान में अनुपलब्ध है।",
+    "retry": "पुनः प्रयास करें",
+    "insufficientData": "इस आइटम के लिए पूर्वानुमान उत्पन्न करने हेतु अपर्याप्त डेटा।",
+    "languageFallbackNotice": "अनुवाद अनुपलब्ध — परिणाम अंग्रेज़ी में प्रदर्शित हो रहे हैं।"
+  },
+  "language": {
+    "en": "English",
+    "hi": "हिंदी"
+  },
+  "common": {
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "error": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।",
+    "success": "परिवर्तन सफलतापूर्वक सहेजे गए।",
+    "loading": "लोड हो रहा है..."
+  },
+  "evaluation": {
+    "underperformingLabel": "अंडरपरफॉर्मिंग",
+    "unavailable": "केंद्र मूल्यांकन अस्थायी रूप से अनुपलब्ध है",
+    "metricStockBelowReorder": "स्टॉक पुनः आदेश स्तर से नीचे",
+    "metricAttendanceBelow50": "उपस्थिति < 50%",
+    "metricBedsAtZero": "बिस्तर शून्य पर",
+    "metricFootfallExceedsCapacity": "फुटफॉल क्षमता से अधिक"
+  }
+}

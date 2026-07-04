@@ -1,0 +1,85 @@
+{
+  "navigation": {
+    "dashboard": "Dashboard",
+    "centres": "Health Centres",
+    "insights": "AI Insights",
+    "assistant": "AI Assistant",
+    "contacts": "Contacts",
+    "directives": "Directives",
+    "myCentre": "My Centre",
+    "login": "Login",
+    "logout": "Logout"
+  },
+  "auth": {
+    "loginButton": "Sign in with Google",
+    "errorNetwork": "Network unavailable. Please try again.",
+    "errorUnauthorized": "Account not authorized. Contact your administrator.",
+    "errorPopupBlocked": "Sign-in popup was blocked. Please allow popups and try again.",
+    "errorGeneric": "Login failed. Please try again.",
+    "unauthorized": "You are not authorized to access this page."
+  },
+  "dashboard": {
+    "title": "District Dashboard",
+    "summaryBeds": "Total Beds Available",
+    "summaryDoctors": "Doctors Present",
+    "summaryFootfall": "Today's Footfall",
+    "summaryStock": "Stock Alerts",
+    "noData": "No health centre data is currently available.",
+    "alertStockLow": "Stock Low",
+    "alertFullCapacity": "Full Capacity",
+    "alertUnderstaffed": "Understaffed",
+    "alertUnderperforming": "Underperforming"
+  },
+  "stock": {
+    "medicineName": "Medicine Name",
+    "quantity": "Quantity",
+    "reorderLevel": "Reorder Level",
+    "expiry": "Expiry Date",
+    "statusGreen": "Sufficient",
+    "statusYellow": "Low Stock",
+    "statusRed": "Critical"
+  },
+  "footfall": {
+    "dailyCount": "Daily Patient Count",
+    "chartTitle": "7-Day Patient Footfall",
+    "confirmationMessage": "Footfall recorded successfully."
+  },
+  "beds": {
+    "totalBeds": "Total Beds",
+    "availableBeds": "Available Beds",
+    "fullCapacityAlert": "This centre has reached full bed capacity."
+  },
+  "doctors": {
+    "present": "Doctors Present",
+    "assigned": "Doctors Assigned",
+    "understaffedAlert": "This centre is understaffed (below 50% attendance)."
+  },
+  "ai": {
+    "predictionsTitle": "Stock-Out Predictions",
+    "redistributionTitle": "Resource Redistribution Recommendations",
+    "loading": "Generating AI insights...",
+    "error": "AI service is currently unavailable.",
+    "retry": "Retry",
+    "insufficientData": "Insufficient data to generate predictions for this item.",
+    "languageFallbackNotice": "Translation unavailable — displaying results in English."
+  },
+  "language": {
+    "en": "English",
+    "hi": "Hindi"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "error": "An error occurred. Please try again.",
+    "success": "Changes saved successfully.",
+    "loading": "Loading..."
+  },
+  "evaluation": {
+    "underperformingLabel": "Underperforming",
+    "unavailable": "Centre evaluation is temporarily unavailable",
+    "metricStockBelowReorder": "Stock below reorder",
+    "metricAttendanceBelow50": "Attendance < 50%",
+    "metricBedsAtZero": "Beds at zero",
+    "metricFootfallExceedsCapacity": "Footfall exceeds capacity"
+  }
+}

@@ -1,0 +1,30 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+import { locales, localeNames, type Locale } from '@/lib/i18n/config';
+import { useLocaleSwitch } from '@/lib/i18n/provider';
+
+/**
+ * Dropdown component for switching between English and Hindi.
+ * Uses next-intl hooks for translated labels and persists the
+ * selection to localStorage (synced to user profile when authenticated).
+ */
+export function LanguageSwitcher() {
+  const t = useTranslations('language');
+  const { locale, changeLocale } = useLocaleSwitch();
+
+  return (
+    <select
+      value={locale}
+      onChange={(e) => changeLocale(e.target.value as Locale)}
+      aria-label="Select language"
+      className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+    >
+      {locales.map((loc) => (
+        <option key={loc} value={loc}>
+          {t(loc)}
+        </option>
+      ))}
+    </select>
+  );
+}

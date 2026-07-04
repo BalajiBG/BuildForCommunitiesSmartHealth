@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Health AI Platform — Architecture</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+        
+        /* Header */
+        .header { text-align: center; margin-bottom: 48px; }
+        .logo { width: 64px; height: 64px; background: #4f46e5; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+        .logo svg { width: 36px; height: 36px; fill: none; stroke: white; stroke-width: 2; }
+        h1 { font-size: 2.5rem; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
+        .subtitle { font-size: 1.1rem; color: #64748b; max-width: 600px; margin: 0 auto; }
+        
+        /* Architecture Diagram */
+        .arch-section { margin-bottom: 48px; }
+        .arch-section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 24px; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+        
+        .arch-grid { display: grid; grid-template-columns: 1fr 80px 1fr 80px 1fr; align-items: center; gap: 0; margin-bottom: 40px; }
+        .arch-box { background: white; border-radius: 16px; padding: 24px; border: 2px solid #e2e8f0; text-align: center; }
+        .arch-box.highlight { border-color: #4f46e5; box-shadow: 0 4px 24px rgba(79, 70, 229, 0.1); }
+        .arch-box h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+        .arch-box p { font-size: 0.8rem; color: #64748b; }
+        .arch-arrow { text-align: center; font-size: 1.5rem; color: #94a3b8; }
+        
+        /* Flow Diagram */
+        .flow { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 24px 0; }
+        .flow-step { background: white; border: 2px solid #e2e8f0; border-radius: 12px; padding: 12px 20px; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .flow-step .num { width: 24px; height: 24px; background: #4f46e5; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; }
+        .flow-arrow { display: flex; align-items: center; color: #94a3b8; font-size: 1.2rem; }
+        
+        /* Features Grid */
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 24px; }
+        .feature-card { background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; }
+        .feature-card .icon { font-size: 1.5rem; margin-bottom: 8px; }
+        .feature-card h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+        .feature-card p { font-size: 0.8rem; color: #64748b; }
+        
+        /* Tech Stack */
+        .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
+        .tech-item { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 10px; }
+        .tech-item .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .tech-item span { font-size: 0.85rem; font-weight: 600; }
+        .tech-item small { font-size: 0.75rem; color: #94a3b8; margin-left: auto; }
+        
+        /* Roles */
+        .roles { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 16px; }
+        .role-card { background: white; border-radius: 12px; padding: 24px; border: 2px solid #e2e8f0; }
+        .role-card h4 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .role-card ul { list-style: none; }
+        .role-card li { font-size: 0.8rem; color: #475569; padding: 4px 0; padding-left: 16px; position: relative; }
+        .role-card li::before { content: "→"; position: absolute; left: 0; color: #4f46e5; }
+        
+        /* Principles */
+        .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 16px; }
+        .principle { text-align: center; padding: 16px; background: white; border-radius: 10px; border: 1px solid #e2e8f0; }
+        .principle .emoji { font-size: 1.5rem; margin-bottom: 6px; }
+        .principle p { font-size: 0.75rem; font-weight: 600; color: #475569; }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .arch-grid { grid-template-columns: 1fr; gap: 12px; }
+            .arch-arrow { transform: rotate(90deg); }
+            .roles { grid-template-columns: 1fr; }
+            h1 { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
+            </div>
+            <h1>Smart Health AI Platform</h1>
+            <p class="subtitle">AI-powered multilingual platform for real-time health centre management across Indian districts</p>
+        </div>
+
+        <!-- Architecture -->
+        <div class="arch-section">
+            <h2>🏗️ System Architecture</h2>
+            <div class="arch-grid">
+                <div class="arch-box">
+                    <h3>👤 Users</h3>
+                    <p>District Admin<br>Centre Staff<br>Browser / Mobile</p>
+                </div>
+                <div class="arch-arrow">→</div>
+                <div class="arch-box highlight">
+                    <h3>⚡ Next.js 15</h3>
+                    <p>App Router + API Routes<br>Single Container<br>Google Cloud Run</p>
+                </div>
+                <div class="arch-arrow">→</div>
+                <div class="arch-box">
+                    <h3>☁️ Google Cloud</h3>
+                    <p>Firebase RTDB<br>Gemini 2.0 AI<br>Firebase Auth</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Flow -->
+        <div class="arch-section">
+            <h2>🤖 AI Decision Flow</h2>
+            <div class="flow">
+                <div class="flow-step"><span class="num">1</span> Real-time data ingestion</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step"><span class="num">2</span> Pattern detection</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step"><span class="num">3</span> Gemini AI analysis</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step"><span class="num">4</span> Specific recommendations</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step"><span class="num">5</span> Admin issues directive</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step"><span class="num">6</span> Staff executes action</div>
+            </div>
+        </div>
+
+        <!-- Tech Stack -->
+        <div class="arch-section">
+            <h2>🛠️ Technology Stack</h2>
+            <div class="tech-grid">
+                <div class="tech-item"><span class="dot" style="background:#4f46e5"></span><span>Next.js 15</span><small>Frontend + API</small></div>
+                <div class="tech-item"><span class="dot" style="background:#f59e0b"></span><span>Firebase RTDB</span><small>Real-time DB</small></div>
+                <div class="tech-item"><span class="dot" style="background:#10b981"></span><span>Gemini 2.0 Flash</span><small>AI Engine</small></div>
+                <div class="tech-item"><span class="dot" style="background:#ef4444"></span><span>Firebase Auth</span><small>Authentication</small></div>
+                <div class="tech-item"><span class="dot" style="background:#06b6d4"></span><span>TypeScript</span><small>Type Safety</small></div>
+                <div class="tech-item"><span class="dot" style="background:#8b5cf6"></span><span>Tailwind CSS</span><small>UI Framework</small></div>
+                <div class="tech-item"><span class="dot" style="background:#f97316"></span><span>Cloud Run</span><small>Deployment</small></div>
+                <div class="tech-item"><span class="dot" style="background:#ec4899"></span><span>Chart.js</span><small>Visualizations</small></div>
+            </div>
+        </div>
+
+        <!-- Responsible AI -->
+        <div class="arch-section">
+            <h2>🛡️ Responsible AI Principles</h2>
+            <div class="principles">
+                <div class="principle"><div class="emoji">🔍</div><p>Transparent</p></div>
+                <div class="principle"><div class="emoji">⚖️</div><p>Unbiased</p></div>
+                <div class="principle"><div class="emoji">👤</div><p>Human-in-Loop</p></div>
+                <div class="principle"><div class="emoji">📋</div><p>Accountable</p></div>
+                <div class="principle"><div class="emoji">🔒</div><p>Privacy-First</p></div>
+                <div class="principle"><div class="emoji">🌍</div><p>Inclusive</p></div>
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="arch-section">
+            <h2>✨ Platform Features</h2>
+            <div class="features">
+                <div class="feature-card"><div class="icon">💊</div><h4>Medicine Stock Monitoring</h4><p>Real-time tracking with AI stock-out predictions, actionable indent system, expiry alerts</p></div>
+                <div class="feature-card"><div class="icon">📊</div><h4>Patient Insights (Power BI-style)</h4><p>Interactive cross-filtering by department, age, gender, visit type — bidirectional</p></div>
+                <div class="feature-card"><div class="icon">🛏️</div><h4>Bed Availability</h4><p>Real-time tracking with timestamps, full-capacity alerts, patient diversion</p></div>
+                <div class="feature-card"><div class="icon">👨‍⚕️</div><h4>Doctor Attendance</h4><p>Daily tracking, understaffed flagging (<50%), staff rotation directives</p></div>
+                <div class="feature-card"><div class="icon">🤖</div><h4>AI Assistant (Context-Aware)</h4><p>Natural language queries on live data, role-scoped, navigation guidance</p></div>
+                <div class="feature-card"><div class="icon">🔄</div><h4>Smart Redistribution</h4><p>AI recommends transfers: source → destination, quantity, explanation</p></div>
+                <div class="feature-card"><div class="icon">📋</div><h4>Admin Directives</h4><p>Issue → Acknowledge → In Progress → Complete workflow with audit trail</p></div>
+                <div class="feature-card"><div class="icon">🏕️</div><h4>Health Camps</h4><p>Schedule, track, measure community outreach — target vs actual beneficiaries</p></div>
+                <div class="feature-card"><div class="icon">🏥</div><h4>Infrastructure Registry</h4><p>Staff, lab equipment, facilities — full digital asset register per centre</p></div>
+                <div class="feature-card"><div class="icon">📱</div><h4>Contact Directory</h4><p>One-tap call/email for referrals, emergency numbers, inter-centre coordination</p></div>
+                <div class="feature-card"><div class="icon">📝</div><h4>Audit Trail</h4><p>Every action logged — user, time, category. Tamper-evident accountability</p></div>
+                <div class="feature-card"><div class="icon">🌐</div><h4>Multilingual (Beta)</h4><p>English + Hindi interface for rural health workers</p></div>
+            </div>
+        </div>
+
+        <!-- Roles -->
+        <div class="arch-section">
+            <h2>👥 Role-Based Experience</h2>
+            <div class="roles">
+                <div class="role-card">
+                    <h4>🏢 District Admin</h4>
+                    <ul>
+                        <li>Monitor all centres on one dashboard</li>
+                        <li>AI-powered predictions & insights</li>
+                        <li>Issue directives to centres</li>
+                        <li>View audit trail for accountability</li>
+                        <li>Redistribution recommendations</li>
+                        <li>Centre performance flagging</li>
+                    </ul>
+                </div>
+                <div class="role-card">
+                    <h4>🏥 Centre Staff</h4>
+                    <ul>
+                        <li>Update stock, beds, attendance daily</li>
+                        <li>Record patient visits with demographics</li>
+                        <li>Raise indents, remove expired stock</li>
+                        <li>Acknowledge & execute directives</li>
+                        <li>Schedule and track health camps</li>
+                        <li>Manage infrastructure registry</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Sources -->
+        <div class="arch-section">
+            <h2>📚 Public Data Sources Used</h2>
+            <div class="tech-grid">
+                <div class="tech-item"><span class="dot" style="background:#059669"></span><span>IPHS Guidelines</span><small>Bed/Staff norms</small></div>
+                <div class="tech-item"><span class="dot" style="background:#059669"></span><span>NLEM 2022</span><small>Medicine list</small></div>
+                <div class="tech-item"><span class="dot" style="background:#059669"></span><span>HMIS Reports</span><small>Footfall patterns</small></div>
+                <div class="tech-item"><span class="dot" style="background:#059669"></span><span>IndiaAI/NHA</span><small>Centre directory</small></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align:center; margin-top:48px; padding-top:24px; border-top:1px solid #e2e8f0;">
+            <p style="font-size:0.85rem; color:#94a3b8;">Smart Health AI Platform • Built for Communities • Google Cloud + Gemini AI</p>
+        </div>
+    </div>
+</body>
+</html>
