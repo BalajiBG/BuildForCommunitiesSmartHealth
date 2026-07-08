@@ -1,12 +1,17 @@
 /**
  * POST /api/ai/chat
  *
- * AI Chatbot endpoint that:
- * 1. Receives { question: string, districtId: string }
- * 2. Fetches relevant data from RTDB based on keywords in the question
- * 3. Builds a context string with the data
- * 4. Calls Gemini with: system prompt + context + user question
- * 5. Returns the AI response (or local fallback if Gemini is unavailable)
+ * AI Chatbot endpoint — context-aware health data assistant.
+ * 
+ * Architecture:
+ * 1. Receives { question, districtId, role, centreId }
+ * 2. ALWAYS fetches ALL data categories from RTDB (data is small per district)
+ * 3. Builds a rich, structured context string with actual numbers
+ * 4. Calls Gemini with: system prompt + full context + user question
+ * 5. If Gemini fails → local fallback that ALWAYS shows actual data
+ *
+ * Design principle: The fallback must be as useful as Gemini.
+ * Every response includes centre names and actual numbers.
  */
 
 import { NextResponse } from 'next/server';
@@ -23,379 +28,578 @@ interface ChatRequestBody {
 
 interface CentreSnapshot {
   name?: string;
+  type?: string;
   totalBeds?: number;
   availableBeds?: number;
   assignedDoctors?: number;
   maxPatientCapacity?: number;
 }
 
+interface MedicineEntry {
+  name?: string;
+  quantity?: number;
+  reorderLevel?: number;
+  expiryDate?: string;
+  unit?: string;
+}
+
+// ─── Structured data types for context building ───────────────────────────────
+
+interface CentreData {
+  id: string;
+  name: string;
+  type: string;
+  beds: { total: number; available: number; occupancyPct: number };
+  doctors: { assigned: number; present: number; attendancePct: number };
+  footfall: number;
+  medicines: {
+    total: number;
+    critical: { name: string; quantity: number; reorderLevel: number }[];
+    expiringSoon: { name: string; expiryDate: string; daysLeft: number }[];
+  };
+  issues: string[];
+}
+
+
 const SYSTEM_PROMPT = `You are a helpful AI health assistant for the Smart Health AI Platform managing PHCs and CHCs in a district.
 
-RULES:
-- Answer in clear, structured format with bullet points
-- Be concise — max 150 words
-- Always mention specific centre names and numbers
-- Give actionable next steps when relevant
-- Use emojis sparingly for section headers only (📋, ⚠️, ✅, 💡)
-- If the user asks "what should I do" — prioritize the most urgent issues
-- Never dump raw data — always interpret and summarize
-- If you're unsure, suggest what questions to ask instead
+CRITICAL RULES:
+- ALWAYS mention specific centre names and actual numbers from the CONTEXT DATA
+- Never say "operating within normal parameters" without showing the actual figures
+- Structure responses with bullet points showing data per centre
+- Be concise — max 200 words
+- Give actionable next steps with specific page/tab navigation
+- Use emojis sparingly for section headers only (📋, ⚠️, ✅, 💡, 🛏️, 💊, 👨‍⚕️, 👥)
+- If data shows zeroes or no data recorded, say so explicitly
+- Interpret the numbers — don't just repeat them. Flag concerning patterns.
 - Be conversational and helpful, like a knowledgeable colleague
 
-APP NAVIGATION GUIDE (use this to direct users):
-- Dashboard: overview of all centres, click a centre card to see details
+RESPONSE FORMAT:
+1. Direct answer with actual numbers per centre
+2. Flag any concerns (low stock, high occupancy, low attendance)
+3. One actionable recommendation with exact page/tab to visit
+
+APP NAVIGATION GUIDE:
+- Dashboard: overview of all centres, click a centre card for details
 - AI Insights: stock-out predictions and redistribution recommendations
-- AI Assistant: this chat (you are here)
-- Contacts: phone numbers for admin, centres, and emergency services
+- AI Assistant: this chat
+- Contacts: phone numbers for admin, centres, emergency services
 - Directives: admin issues action orders to centres (admin only)
 - Centre Detail → Overview tab: patient insights, footfall, beds, doctors
 - Centre Detail → Infrastructure tab: staff, lab tests, facilities
 - Centre Detail → Medicine Stock tab: view/update stock, raise indent
-- Centre Detail → Health Camps tab: schedule and track community camps
-- Centre Detail → Audit Log tab: see all actions taken by staff
+- Centre Detail → Health Camps tab: schedule community camps
+- Centre Detail → Audit Log tab: all actions taken by staff
 
-When suggesting an action, ALWAYS tell the user which page/tab to go to.
-Example: "Go to Medicine Stock tab and click 'Raise Emergency Indent' next to Insulin."`;
+When suggesting an action, ALWAYS tell the user which page/tab to go to.`;
 
 
-/**
- * Detect which data categories are relevant based on keywords in the question.
- */
-function detectCategories(question: string): string[] {
-  const q = question.toLowerCase();
-  const categories: string[] = [];
+// ─── Data fetching — always fetches everything for full context ────────────────
 
-  if (q.includes('stock') || q.includes('medicine') || q.includes('drug') || q.includes('expire') || q.includes('expiry')) {
-    categories.push('medicines');
-  }
-  if (q.includes('bed') || q.includes('capacity') || q.includes('occupancy')) {
-    categories.push('beds');
-  }
-  if (q.includes('doctor') || q.includes('staff') || q.includes('attendance') || q.includes('understaffed')) {
-    categories.push('attendance');
-  }
-  if (q.includes('footfall') || q.includes('patient') || q.includes('visit') || q.includes('opd')) {
-    categories.push('footfall');
-  }
-  if (q.includes('underperform') || q.includes('flag') || q.includes('critical') || q.includes('alert')) {
-    categories.push('evaluation');
-  }
-
-  // If no specific category detected, fetch a summary of everything
-  if (categories.length === 0) {
-    categories.push('medicines', 'beds', 'attendance', 'footfall');
-  }
-
-  return categories;
-}
-
-/**
- * Fetch relevant data from Firebase RTDB based on detected categories.
- */
-async function fetchContextData(districtId: string, categories: string[], scopedCentreId?: string | null): Promise<string> {
-  const contextParts: string[] = [];
-
-  // Get centre IDs for the district
+async function fetchAllCentreData(districtId: string, scopedCentreId?: string | null): Promise<CentreData[]> {
   const centresSnapshot = await adminDatabase
     .ref(dbPaths.districtCentres(districtId))
     .once('value');
   const centresMap = centresSnapshot.val();
 
-  if (!centresMap) {
-    return 'No centres found for this district.';
-  }
+  if (!centresMap) return [];
 
   const centreIds = Object.keys(centresMap);
-  const today = new Date().toISOString().split('T')[0];
-
-  // If scoped to a single centre (Centre Staff), only fetch that centre's data
   const activeCentreIds = scopedCentreId ? [scopedCentreId] : centreIds;
+  const today = new Date().toISOString().split('T')[0];
+  const results: CentreData[] = [];
 
-  // Fetch centre names
-  const centreNames: Record<string, string> = {};
   for (const centreId of activeCentreIds) {
-    const snap = await adminDatabase.ref(dbPaths.centre(centreId)).once('value');
-    const data = snap.val() as CentreSnapshot | null;
-    centreNames[centreId] = data?.name || centreId;
-  }
+    // Fetch centre info
+    const centreSnap = await adminDatabase.ref(dbPaths.centre(centreId)).once('value');
+    const info = centreSnap.val() as CentreSnapshot | null;
+    if (!info) continue;
 
-  if (categories.includes('medicines')) {
-    const medicineData: string[] = [];
-    for (const centreId of activeCentreIds) {
-      const medsSnap = await adminDatabase.ref(dbPaths.centreMedicines(centreId)).once('value');
-      const meds = medsSnap.val();
-      if (!meds) continue;
+    const totalBeds = Number(info.totalBeds ?? 0);
+    const availableBeds = Number(info.availableBeds ?? 0);
+    const assignedDoctors = Number(info.assignedDoctors ?? 0);
 
-      const entries = Object.entries(meds as Record<string, Record<string, unknown>>);
-      const critical = entries.filter(([, m]) => Number(m.quantity ?? 0) < Number(m.reorderLevel ?? 0));
-      const expiring = entries.filter(([, m]) => {
-        const exp = String(m.expiryDate ?? '');
-        if (!exp) return false;
-        const daysToExpiry = Math.ceil((new Date(exp).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-        return daysToExpiry <= 30 && daysToExpiry > 0;
-      });
+    // Fetch attendance
+    const attSnap = await adminDatabase.ref(dbPaths.attendance(centreId, today)).once('value');
+    const attData = attSnap.val() as Record<string, unknown> | null;
+    const presentDoctors = attData ? Number(attData.presentCount ?? 0) : 0;
 
-      if (critical.length > 0 || expiring.length > 0) {
-        medicineData.push(
-          `${centreNames[centreId]}: ${critical.length} medicines below reorder level, ${expiring.length} expiring within 30 days. ` +
-          `Critical: ${critical.slice(0, 5).map(([, m]) => `${m.name} (qty: ${m.quantity}, reorder: ${m.reorderLevel})`).join(', ')}`
-        );
-      }
-    }
-    if (medicineData.length > 0) {
-      contextParts.push(`MEDICINE STOCK:\n${medicineData.join('\n')}`);
-    } else {
-      contextParts.push('MEDICINE STOCK: All centres have adequate stock levels.');
-    }
-  }
+    // Fetch footfall
+    const ffSnap = await adminDatabase.ref(dbPaths.footfall(centreId, today)).once('value');
+    const ffData = ffSnap.val();
+    const footfall = ffData ? Number((ffData as Record<string, unknown>).count ?? ffData ?? 0) : 0;
 
-  if (categories.includes('beds')) {
-    const bedData: string[] = [];
-    for (const centreId of activeCentreIds) {
-      const snap = await adminDatabase.ref(dbPaths.centre(centreId)).once('value');
-      const data = snap.val() as CentreSnapshot | null;
-      if (!data) continue;
-      const total = Number(data.totalBeds ?? 0);
-      const available = Number(data.availableBeds ?? 0);
-      bedData.push(`${centreNames[centreId]}: ${available}/${total} beds available (${total > 0 ? Math.round((available / total) * 100) : 0}% free)`);
-    }
-    contextParts.push(`BED AVAILABILITY:\n${bedData.join('\n')}`);
-  }
+    // Fetch medicines
+    const medsSnap = await adminDatabase.ref(dbPaths.centreMedicines(centreId)).once('value');
+    const meds = medsSnap.val() as Record<string, MedicineEntry> | null;
 
-  if (categories.includes('attendance')) {
-    const attendanceData: string[] = [];
-    for (const centreId of activeCentreIds) {
-      const centreSnap = await adminDatabase.ref(dbPaths.centre(centreId)).once('value');
-      const centreInfo = centreSnap.val() as CentreSnapshot | null;
-      const assigned = Number(centreInfo?.assignedDoctors ?? 0);
+    const critical: CentreData['medicines']['critical'] = [];
+    const expiringSoon: CentreData['medicines']['expiringSoon'] = [];
+    let totalMeds = 0;
 
-      const attSnap = await adminDatabase.ref(dbPaths.attendance(centreId, today)).once('value');
-      const attData = attSnap.val() as Record<string, unknown> | null;
-      const present = attData ? Number(attData.presentCount ?? 0) : 0;
-
-      attendanceData.push(`${centreNames[centreId]}: ${present}/${assigned} doctors present (${assigned > 0 ? Math.round((present / assigned) * 100) : 0}%)`);
-    }
-    contextParts.push(`DOCTOR ATTENDANCE (${today}):\n${attendanceData.join('\n')}`);
-  }
-
-  if (categories.includes('footfall')) {
-    const footfallData: string[] = [];
-    for (const centreId of activeCentreIds) {
-      const ffSnap = await adminDatabase.ref(dbPaths.footfall(centreId, today)).once('value');
-      const ffData = ffSnap.val();
-      const count = ffData ? Number((ffData as Record<string, unknown>).count ?? ffData ?? 0) : 0;
-      footfallData.push(`${centreNames[centreId]}: ${count} patients today`);
-    }
-    contextParts.push(`PATIENT FOOTFALL (${today}):\n${footfallData.join('\n')}`);
-  }
-
-  if (categories.includes('evaluation')) {
-    const evalData: string[] = [];
-    for (const centreId of activeCentreIds) {
-      const centreSnap = await adminDatabase.ref(dbPaths.centre(centreId)).once('value');
-      const centreInfo = centreSnap.val() as CentreSnapshot | null;
-      if (!centreInfo) continue;
-
-      const assigned = Number(centreInfo.assignedDoctors ?? 0);
-      const attSnap = await adminDatabase.ref(dbPaths.attendance(centreId, today)).once('value');
-      const attData = attSnap.val() as Record<string, unknown> | null;
-      const present = attData ? Number(attData.presentCount ?? 0) : 0;
-
-      const medsSnap = await adminDatabase.ref(dbPaths.centreMedicines(centreId)).once('value');
-      const meds = medsSnap.val() as Record<string, Record<string, unknown>> | null;
-      let hasLowStock = false;
-      if (meds) {
-        hasLowStock = Object.values(meds).some(m => Number(m.quantity ?? 0) < Number(m.reorderLevel ?? 0));
-      }
-
-      const issues: string[] = [];
-      if (assigned > 0 && present / assigned < 0.5) issues.push('low attendance');
-      if (hasLowStock) issues.push('low stock');
-
-      if (issues.length > 0) {
-        evalData.push(`${centreNames[centreId]}: FLAGGED — ${issues.join(', ')}`);
-      }
-    }
-    if (evalData.length > 0) {
-      contextParts.push(`UNDERPERFORMING CENTRES:\n${evalData.join('\n')}`);
-    } else {
-      contextParts.push('UNDERPERFORMING CENTRES: None flagged today.');
-    }
-  }
-
-  return contextParts.join('\n\n');
-}
-
-/**
- * Local fallback response engine — generates context-aware responses
- * by analyzing the question semantically and pulling specific data.
- */
-function generateLocalResponse(_question: string, contextData: string, isStaff?: boolean): string {
-  const q = _question.toLowerCase();
-
-  // Check if question is about a specific centre
-  const centreMatch = contextData.match(/(\w+ \w+):/g);
-  const centreNames = centreMatch ? [...new Set(centreMatch.map(m => m.replace(':', '').trim()))] : [];
-  const mentionedCentre = centreNames.find(name => q.includes(name.toLowerCase()));
-
-  // If asking about a specific centre, give centre-specific answer
-  if (mentionedCentre) {
-    const lines = contextData.split('\n');
-    const centreLines = lines.filter(l => l.includes(mentionedCentre));
-    
-    if (centreLines.length === 0) {
-      return `I don't have detailed data for "${mentionedCentre}" right now.`;
-    }
-
-    const issues: string[] = [];
-    const okItems: string[] = [];
-
-    for (const line of centreLines) {
-      if (line.includes('below reorder') || line.includes('Critical')) {
-        issues.push(`💊 Medicine shortage: ${line.split('Critical:')[1]?.trim().slice(0, 100) || 'multiple items low'}`);
-      }
-      if (line.includes('0/') && line.includes('beds')) {
-        issues.push('🛏️ At full bed capacity — no beds available');
-      }
-      if (line.includes('0%') || (line.includes('/') && line.includes('doctors') && line.includes('0/'))) {
-        issues.push('👨‍⚕️ Critically understaffed');
-      } else if (line.includes('doctors') && !line.includes('100%')) {
-        const match = line.match(/(\d+)\/(\d+)/);
-        if (match) {
-          const present = Number(match[1]);
-          const assigned = Number(match[2]);
-          if (assigned > 0 && present / assigned < 0.5) {
-            issues.push(`👨‍⚕️ Low attendance: ${present}/${assigned} doctors`);
-          } else {
-            okItems.push(`👨‍⚕️ Doctor attendance: ${present}/${assigned}`);
+    if (meds) {
+      const entries = Object.values(meds);
+      totalMeds = entries.length;
+      for (const m of entries) {
+        const qty = Number(m.quantity ?? 0);
+        const reorder = Number(m.reorderLevel ?? 0);
+        if (qty < reorder) {
+          critical.push({ name: m.name || 'Unknown', quantity: qty, reorderLevel: reorder });
+        }
+        if (m.expiryDate) {
+          const daysLeft = Math.ceil((new Date(m.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+          if (daysLeft <= 30 && daysLeft > 0) {
+            expiringSoon.push({ name: m.name || 'Unknown', expiryDate: m.expiryDate, daysLeft });
           }
         }
       }
-      if (line.includes('beds') && !line.includes('0/')) {
-        const match = line.match(/(\d+)\/(\d+) beds/);
-        if (match) okItems.push(`🛏️ Beds: ${match[1]}/${match[2]} available`);
-      }
-      if (line.includes('patients today')) {
-        okItems.push(`👥 ${line.split(':')[1]?.trim() || 'footfall data available'}`);
-      }
     }
 
-    let response = `📊 ${mentionedCentre}\n\n`;
-    if (issues.length > 0) {
-      response += `⚠️ Issues:\n${issues.map(i => `• ${i}`).join('\n')}\n\n`;
-    }
-    if (okItems.length > 0) {
-      response += `✅ OK:\n${okItems.map(i => `• ${i}`).join('\n')}\n\n`;
-    }
-    if (issues.length === 0 && okItems.length === 0) {
-      response += 'Operating within normal parameters.\n\n';
-    }
-    if (issues.length > 0) {
-      response += isStaff
-        ? '💡 Go to Medicine Stock tab to raise indent, or Overview tab to update data.'
-        : '💡 Go to Directives page to issue an action order for this centre.';
-    }
-    return response.trim();
-  }
-
-  // General summary — for Centre Staff this is already scoped to their centre
-  const hasStockIssues = contextData.includes('below reorder') || contextData.includes('expiring');
-  const hasBedIssues = contextData.includes('0/') && contextData.includes('beds');
-  const hasStaffIssues = contextData.includes('low attendance');
-
-  // For Centre Staff: give direct, specific answers from their centre's data
-  if (isStaff) {
-    // Check if question is about medicines/stock
-    if (q.includes('medicine') || q.includes('stock') || q.includes('low') || q.includes('indent') || q.includes('drug')) {
-      const stockSection = contextData.split('MEDICINE STOCK:')[1]?.split('\n\n')[0]?.trim() || '';
-      if (!stockSection || stockSection.includes('adequate')) {
-        return '✅ All medicines at your centre are above minimum required levels. No action needed.';
-      }
-      // Extract specific medicine names from the Critical: section
-      const criticalMatch = stockSection.match(/Critical: (.+)/);
-      if (criticalMatch) {
-        const medicines = criticalMatch[1].split('), ').map(m => '• ' + m.trim().replace(/\)$/, ')'));
-        return `⚠️ Low Stock at Your Centre:\n\n${medicines.join('\n')}\n\n💡 Go to Medicine Stock tab → click "Raise Emergency Indent" for each.`;
-      }
-      return `⚠️ Your centre has medicines below minimum levels.\n\n💡 Go to Medicine Stock tab to see details and raise indent.`;
-    }
-
-    // Beds question
-    if (q.includes('bed') || q.includes('capacity')) {
-      const bedSection = contextData.split('BED AVAILABILITY:')[1]?.split('\n\n')[0]?.trim() || '';
-      if (bedSection) {
-        return `🛏️ Your Centre Beds:\n\n• ${bedSection.split('\n')[0]?.split(':')[1]?.trim() || 'Data available in Overview tab'}\n\n💡 Go to Overview tab to update availability.`;
-      }
-    }
-
-    // Attendance
-    if (q.includes('doctor') || q.includes('staff') || q.includes('attend')) {
-      const attSection = contextData.split('DOCTOR ATTENDANCE')[1]?.split('\n\n')[0]?.trim() || '';
-      if (attSection) {
-        return `👨‍⚕️ Today's Attendance:\n\n• ${attSection.split('\n')[0]?.split(':')[1]?.trim() || 'Check Overview tab'}\n\n💡 Go to Overview tab to record today's attendance.`;
-      }
-    }
-
-    // Footfall/patients
-    if (q.includes('patient') || q.includes('footfall') || q.includes('visit') || q.includes('today')) {
-      const ffSection = contextData.split('PATIENT FOOTFALL')[1]?.split('\n\n')[0]?.trim() || '';
-      if (ffSection) {
-        return `👥 Today's Patients:\n\n• ${ffSection.split('\n')[0]?.split(':')[1]?.trim() || '0'}\n\n💡 Record new visits in the Overview tab using "Record Patient Visit" form.`;
-      }
-    }
-
-    // General "what should I do" or unrecognized
+    // Identify issues
     const issues: string[] = [];
-    if (hasStockIssues) issues.push('💊 Some medicines are below minimum → Medicine Stock tab');
-    if (hasBedIssues) issues.push('🛏️ Beds at capacity → Update in Overview tab');
-    if (hasStaffIssues) issues.push('👨‍⚕️ Low attendance → Record in Overview tab');
+    if (totalBeds > 0 && availableBeds === 0) issues.push('beds_full');
+    if (totalBeds > 0 && availableBeds / totalBeds <= 0.2) issues.push('beds_low');
+    if (assignedDoctors > 0 && presentDoctors / assignedDoctors < 0.5) issues.push('low_attendance');
+    if (critical.length > 0) issues.push('low_stock');
+    if (expiringSoon.length > 0) issues.push('expiring_stock');
 
-    if (issues.length === 0) {
-      return '✅ Your centre is running smoothly today.\n\nAll stock, beds, and attendance are within normal levels.';
-    }
-    return `📋 Your Centre Today:\n\n${issues.join('\n')}\n\n💡 Address each item using the tab mentioned.`;
-  }
-
-  // District Admin — general district-wide summary
-  const urgentItems: string[] = [];
-  const okItems: string[] = [];
-
-  if (hasStockIssues) {
-    const stockLines = contextData.split('MEDICINE STOCK:')[1]?.split('\n\n')[0]?.trim().split('\n') || [];
-    const criticalCentres = stockLines.filter(l => l.includes('below reorder'));
-    urgentItems.push(`💊 ${criticalCentres.length} centre(s) have medicine shortages`);
-  } else {
-    okItems.push('💊 Medicine stock levels are adequate');
-  }
-
-  if (hasBedIssues) {
-    urgentItems.push('🛏️ At least one centre is at full bed capacity');
-  } else {
-    okItems.push('🛏️ Beds available across all centres');
+    results.push({
+      id: centreId,
+      name: info.name || centreId,
+      type: info.type || 'PHC',
+      beds: {
+        total: totalBeds,
+        available: availableBeds,
+        occupancyPct: totalBeds > 0 ? Math.round(((totalBeds - availableBeds) / totalBeds) * 100) : 0,
+      },
+      doctors: {
+        assigned: assignedDoctors,
+        present: presentDoctors,
+        attendancePct: assignedDoctors > 0 ? Math.round((presentDoctors / assignedDoctors) * 100) : 0,
+      },
+      footfall,
+      medicines: { total: totalMeds, critical, expiringSoon },
+      issues,
+    });
   }
 
-  if (hasStaffIssues) {
-    urgentItems.push('👨‍⚕️ Some centres have low doctor attendance');
-  } else {
-    okItems.push('👨‍⚕️ Doctor attendance is adequate');
-  }
-
-  let response = '';
-  if (urgentItems.length > 0) {
-    response += '⚠️ Needs Attention:\n' + urgentItems.map(i => `• ${i}`).join('\n') + '\n\n';
-  }
-  if (okItems.length > 0) {
-    response += '✅ All Good:\n' + okItems.map(i => `• ${i}`).join('\n') + '\n\n';
-  }
-  if (urgentItems.length > 0) {
-    response += isStaff
-      ? '💡 Go to Medicine Stock tab to raise indent, or Overview to update beds.'
-      : '💡 Go to Directives to issue orders, or AI Insights for detailed predictions.';
-  } else {
-    response += '💡 Everything looks good. No urgent action needed.';
-  }
-  return response.trim();
+  return results;
 }
+
+
+// ─── Build context string for Gemini from structured data ─────────────────────
+
+function buildContextString(centres: CentreData[]): string {
+  if (centres.length === 0) return 'No centre data available for this district.';
+
+  const parts: string[] = [];
+
+  // BED AVAILABILITY
+  parts.push('BED AVAILABILITY:');
+  for (const c of centres) {
+    parts.push(`  ${c.name} (${c.type}): ${c.beds.available}/${c.beds.total} beds available (${c.beds.occupancyPct}% occupied)`);
+  }
+
+  // DOCTOR ATTENDANCE
+  const today = new Date().toISOString().split('T')[0];
+  parts.push(`\nDOCTOR ATTENDANCE (${today}):`);
+  for (const c of centres) {
+    parts.push(`  ${c.name}: ${c.doctors.present}/${c.doctors.assigned} doctors present (${c.doctors.attendancePct}% attendance)`);
+  }
+
+  // PATIENT FOOTFALL
+  parts.push(`\nPATIENT FOOTFALL (${today}):`);
+  for (const c of centres) {
+    parts.push(`  ${c.name}: ${c.footfall} patients today`);
+  }
+
+  // MEDICINE STOCK
+  parts.push('\nMEDICINE STOCK:');
+  for (const c of centres) {
+    if (c.medicines.critical.length > 0) {
+      const critList = c.medicines.critical.slice(0, 5).map(m => `${m.name} (qty: ${m.quantity}, reorder: ${m.reorderLevel})`).join(', ');
+      parts.push(`  ${c.name}: ${c.medicines.critical.length} below reorder — ${critList}`);
+    } else {
+      parts.push(`  ${c.name}: All ${c.medicines.total} medicines at adequate levels`);
+    }
+    if (c.medicines.expiringSoon.length > 0) {
+      const expList = c.medicines.expiringSoon.slice(0, 3).map(m => `${m.name} (${m.daysLeft} days left)`).join(', ');
+      parts.push(`    Expiring soon: ${expList}`);
+    }
+  }
+
+  // FLAGGED ISSUES SUMMARY
+  const flagged = centres.filter(c => c.issues.length > 0);
+  if (flagged.length > 0) {
+    parts.push('\nFLAGGED CENTRES:');
+    for (const c of flagged) {
+      const issueLabels = c.issues.map(i => {
+        switch (i) {
+          case 'beds_full': return 'NO BEDS AVAILABLE';
+          case 'beds_low': return 'beds running low (<20%)';
+          case 'low_attendance': return `low doctor attendance (${c.doctors.attendancePct}%)`;
+          case 'low_stock': return `${c.medicines.critical.length} medicines below reorder`;
+          case 'expiring_stock': return `${c.medicines.expiringSoon.length} medicines expiring soon`;
+          default: return i;
+        }
+      });
+      parts.push(`  ⚠️ ${c.name}: ${issueLabels.join(', ')}`);
+    }
+  }
+
+  return parts.join('\n');
+}
+
+
+// ─── Local fallback — ALWAYS data-driven with actual numbers ──────────────────
+
+function generateLocalResponse(question: string, centres: CentreData[], isStaff: boolean): string {
+  if (centres.length === 0) {
+    return '📋 No centre data found for your district yet.\n\n💡 Go to Dashboard and ensure centres are registered and data is being entered.';
+  }
+
+  const q = question.toLowerCase();
+
+  // Detect which category the user is asking about
+  const askingBeds = /bed|capacity|occupan|admit|ward|room/.test(q);
+  const askingMeds = /medicine|stock|drug|tablet|expire|expiry|indent|pharma|supply|shortage/.test(q);
+  const askingDoctors = /doctor|staff|attend|absent|present|nurse|manpower/.test(q);
+  const askingFootfall = /footfall|patient|visit|opd|rush|crowd|load|traffic/.test(q);
+  const askingIssues = /issue|problem|critical|alert|flag|urgent|underperform|worst|bad|concern|risk|priority|emergency/.test(q);
+  const askingHelp = /help|what can|what should|suggest|recommend|advise|guide|todo|to do/.test(q);
+  const askingOverview = /overview|summary|status|how.*doing|how.*things|report|dashboard|everything|all/.test(q);
+  const askingSpecificCentre = centres.find(c => q.includes(c.name.toLowerCase()));
+
+  // ─── Specific centre query ─────────────────────────────────────────────────
+  if (askingSpecificCentre) {
+    return buildCentreDetailResponse(askingSpecificCentre, isStaff);
+  }
+
+  // ─── Category-specific queries ─────────────────────────────────────────────
+  if (askingBeds && !askingOverview) return buildBedsResponse(centres, isStaff);
+  if (askingMeds && !askingOverview) return buildMedsResponse(centres, isStaff);
+  if (askingDoctors && !askingOverview) return buildDoctorsResponse(centres, isStaff);
+  if (askingFootfall && !askingOverview) return buildFootfallResponse(centres, isStaff);
+  if (askingIssues) return buildIssuesResponse(centres, isStaff);
+  if (askingHelp) return buildHelpResponse(centres, isStaff);
+
+  // ─── Default: full overview with all numbers ───────────────────────────────
+  return buildOverviewResponse(centres, isStaff);
+}
+
+
+// ─── Response builders — each always includes actual numbers ──────────────────
+
+function buildCentreDetailResponse(c: CentreData, isStaff: boolean): string {
+  let r = `📊 ${c.name} (${c.type}) — Status Today:\n\n`;
+
+  r += `🛏️ Beds: ${c.beds.available}/${c.beds.total} available (${c.beds.occupancyPct}% occupied)\n`;
+  r += `👨‍⚕️ Doctors: ${c.doctors.present}/${c.doctors.assigned} present (${c.doctors.attendancePct}% attendance)\n`;
+  r += `👥 Patients today: ${c.footfall}\n`;
+
+  if (c.medicines.critical.length > 0) {
+    r += `\n💊 Low Stock (${c.medicines.critical.length} items):\n`;
+    r += c.medicines.critical.slice(0, 5).map(m => `  • ${m.name}: ${m.quantity} left (reorder at ${m.reorderLevel})`).join('\n');
+    r += '\n';
+  } else {
+    r += `💊 Medicine stock: All ${c.medicines.total} items adequate\n`;
+  }
+
+  if (c.medicines.expiringSoon.length > 0) {
+    r += `\n⏰ Expiring within 30 days: ${c.medicines.expiringSoon.map(m => `${m.name} (${m.daysLeft}d)`).join(', ')}\n`;
+  }
+
+  if (c.issues.length > 0) {
+    r += '\n⚠️ Needs attention: ' + c.issues.map(formatIssue).join(', ') + '\n';
+  } else {
+    r += '\n✅ No critical issues detected.\n';
+  }
+
+  r += '\n💡 ' + (isStaff
+    ? 'Update data in Overview tab. Raise indent in Medicine Stock tab.'
+    : 'Click this centre on Dashboard for full details, or issue a Directive.');
+  return r;
+}
+
+function buildBedsResponse(centres: CentreData[], isStaff: boolean): string {
+  let r = '🛏️ Bed Availability:\n\n';
+  const sorted = [...centres].sort((a, b) => a.beds.available - b.beds.available);
+
+  for (const c of sorted) {
+    const flag = c.beds.available === 0 ? ' ⚠️ FULL' : c.beds.available / c.beds.total <= 0.2 ? ' ⚠️ LOW' : '';
+    r += `• ${c.name}: ${c.beds.available}/${c.beds.total} beds free (${c.beds.occupancyPct}% occupied)${flag}\n`;
+  }
+
+  const totalBeds = centres.reduce((s, c) => s + c.beds.total, 0);
+  const totalAvail = centres.reduce((s, c) => s + c.beds.available, 0);
+  r += `\n📊 District Total: ${totalAvail}/${totalBeds} beds available\n`;
+
+  const fullCentres = centres.filter(c => c.beds.available === 0);
+  if (fullCentres.length > 0) {
+    r += `\n⚠️ ${fullCentres.length} centre(s) at full capacity: ${fullCentres.map(c => c.name).join(', ')}`;
+    r += '\n\n💡 ' + (isStaff
+      ? 'Update bed count in Overview tab when beds are freed.'
+      : 'Consider patient diversion. Go to Directives to order transfers.');
+  } else {
+    r += '\n✅ No centres at full capacity.';
+    r += '\n\n💡 ' + (isStaff ? 'Keep Overview tab updated as patients are admitted/discharged.' : 'Monitor via Dashboard centre cards.');
+  }
+  return r;
+}
+
+
+function buildMedsResponse(centres: CentreData[], isStaff: boolean): string {
+  const centresWithIssues = centres.filter(c => c.medicines.critical.length > 0 || c.medicines.expiringSoon.length > 0);
+
+  if (centresWithIssues.length === 0) {
+    let r = '💊 Medicine Stock — All Clear:\n\n';
+    for (const c of centres) {
+      r += `• ${c.name}: All ${c.medicines.total} medicines at adequate levels\n`;
+    }
+    r += '\n✅ No shortages or expiring medicines detected.';
+    r += '\n\n💡 ' + (isStaff ? 'Go to Medicine Stock tab for full inventory view.' : 'Go to AI Insights for predictive stock-out alerts.');
+    return r;
+  }
+
+  let r = '💊 Medicine Stock Status:\n\n';
+  for (const c of centres) {
+    if (c.medicines.critical.length > 0) {
+      r += `⚠️ ${c.name} — ${c.medicines.critical.length} items below reorder:\n`;
+      r += c.medicines.critical.slice(0, 4).map(m => `  • ${m.name}: ${m.quantity} left (need ${m.reorderLevel})`).join('\n') + '\n';
+    }
+    if (c.medicines.expiringSoon.length > 0) {
+      r += `  ⏰ Expiring soon: ${c.medicines.expiringSoon.slice(0, 3).map(m => `${m.name} (${m.daysLeft}d)`).join(', ')}\n`;
+    }
+  }
+
+  const okCentres = centres.filter(c => c.medicines.critical.length === 0);
+  if (okCentres.length > 0) {
+    r += `\n✅ Adequate: ${okCentres.map(c => c.name).join(', ')}\n`;
+  }
+
+  r += '\n💡 ' + (isStaff
+    ? 'Go to Medicine Stock tab → "Raise Emergency Indent" for critical items.'
+    : 'Go to AI Insights → Redistribution tab, or Directives to issue indent orders.');
+  return r;
+}
+
+function buildDoctorsResponse(centres: CentreData[], isStaff: boolean): string {
+  const today = new Date().toISOString().split('T')[0];
+  let r = `👨‍⚕️ Doctor Attendance (${today}):\n\n`;
+  const sorted = [...centres].sort((a, b) => a.doctors.attendancePct - b.doctors.attendancePct);
+
+  for (const c of sorted) {
+    const flag = c.doctors.attendancePct < 50 ? ' ⚠️ LOW' : c.doctors.attendancePct === 100 ? ' ✅' : '';
+    r += `• ${c.name}: ${c.doctors.present}/${c.doctors.assigned} present (${c.doctors.attendancePct}%)${flag}\n`;
+  }
+
+  const totalAssigned = centres.reduce((s, c) => s + c.doctors.assigned, 0);
+  const totalPresent = centres.reduce((s, c) => s + c.doctors.present, 0);
+  r += `\n📊 District Total: ${totalPresent}/${totalAssigned} doctors present (${totalAssigned > 0 ? Math.round((totalPresent / totalAssigned) * 100) : 0}%)\n`;
+
+  const lowCentres = centres.filter(c => c.doctors.attendancePct < 50 && c.doctors.assigned > 0);
+  if (lowCentres.length > 0) {
+    r += `\n⚠️ ${lowCentres.length} centre(s) critically understaffed: ${lowCentres.map(c => c.name).join(', ')}`;
+    r += '\n\n💡 ' + (isStaff
+      ? 'Record attendance in Overview tab. Contact absent staff.'
+      : 'Consider deploying locum doctors. Go to Directives to issue attendance notice.');
+  } else {
+    r += '\n✅ All centres have adequate staffing.';
+    r += '\n\n💡 ' + (isStaff ? 'Record attendance daily in Overview tab.' : 'Staff levels healthy — no action needed.');
+  }
+  return r;
+}
+
+
+function buildFootfallResponse(centres: CentreData[], isStaff: boolean): string {
+  const today = new Date().toISOString().split('T')[0];
+  let r = `👥 Patient Footfall (${today}):\n\n`;
+  const sorted = [...centres].sort((a, b) => b.footfall - a.footfall);
+
+  for (const c of sorted) {
+    r += `• ${c.name}: ${c.footfall} patients\n`;
+  }
+
+  const totalFootfall = centres.reduce((s, c) => s + c.footfall, 0);
+  r += `\n📊 District Total: ${totalFootfall} patients today\n`;
+
+  const highLoad = centres.filter(c => c.footfall > 0 && c.beds.total > 0 && c.footfall > c.beds.total * 3);
+  if (highLoad.length > 0) {
+    r += `\n⚠️ High patient load at: ${highLoad.map(c => `${c.name} (${c.footfall} patients, ${c.beds.total} beds)`).join(', ')}`;
+  }
+
+  if (totalFootfall === 0) {
+    r += '\n⚠️ No footfall recorded yet today — data may not have been entered.';
+    r += '\n\n💡 ' + (isStaff ? 'Record patient visits in Overview tab.' : 'Ensure centres are recording daily footfall.');
+  } else {
+    r += '\n\n💡 ' + (isStaff ? 'Keep recording visits in Overview tab throughout the day.' : 'Click centre cards on Dashboard for footfall trends.');
+  }
+  return r;
+}
+
+function buildIssuesResponse(centres: CentreData[], isStaff: boolean): string {
+  const flagged = centres.filter(c => c.issues.length > 0);
+
+  if (flagged.length === 0) {
+    let r = '✅ No Critical Issues Found:\n\n';
+    r += `All ${centres.length} centre(s) are operating within normal parameters:\n`;
+    for (const c of centres) {
+      r += `• ${c.name}: Beds ${c.beds.available}/${c.beds.total}, Doctors ${c.doctors.present}/${c.doctors.assigned}, Stock OK\n`;
+    }
+    r += '\n💡 ' + (isStaff ? 'Keep monitoring and updating data regularly.' : 'All clear. Check AI Insights for predictive alerts.');
+    return r;
+  }
+
+  let r = `⚠️ Flagged Issues (${flagged.length}/${centres.length} centres):\n\n`;
+  // Sort by severity (more issues first)
+  const sorted = [...flagged].sort((a, b) => b.issues.length - a.issues.length);
+
+  for (const c of sorted) {
+    r += `🔴 ${c.name}:\n`;
+    for (const issue of c.issues) {
+      switch (issue) {
+        case 'beds_full':
+          r += `  • Beds: 0/${c.beds.total} available — AT CAPACITY\n`; break;
+        case 'beds_low':
+          r += `  • Beds: Only ${c.beds.available}/${c.beds.total} left (${100 - c.beds.occupancyPct}% free)\n`; break;
+        case 'low_attendance':
+          r += `  • Doctors: ${c.doctors.present}/${c.doctors.assigned} present (${c.doctors.attendancePct}%)\n`; break;
+        case 'low_stock':
+          r += `  • Stock: ${c.medicines.critical.length} medicines below reorder (${c.medicines.critical.slice(0, 3).map(m => m.name).join(', ')})\n`; break;
+        case 'expiring_stock':
+          r += `  • Expiring: ${c.medicines.expiringSoon.length} medicines within 30 days\n`; break;
+      }
+    }
+  }
+
+  const okCentres = centres.filter(c => c.issues.length === 0);
+  if (okCentres.length > 0) {
+    r += `\n✅ No issues: ${okCentres.map(c => c.name).join(', ')}\n`;
+  }
+
+  r += '\n💡 ' + (isStaff
+    ? 'Address stock issues in Medicine Stock tab. Update beds/attendance in Overview.'
+    : 'Priority: Issue Directives for critical centres. Check AI Insights for recommendations.');
+  return r;
+}
+
+
+function buildHelpResponse(centres: CentreData[], isStaff: boolean): string {
+  const flagged = centres.filter(c => c.issues.length > 0);
+
+  if (isStaff) {
+    const c = centres[0]; // Staff sees only their centre
+    if (!c) return '📋 No data available. Ensure your centre is set up correctly.';
+
+    let r = `📋 Suggested Actions for ${c.name}:\n\n`;
+    const actions: string[] = [];
+
+    if (c.medicines.critical.length > 0) {
+      actions.push(`1. 💊 Raise indent for ${c.medicines.critical.length} low-stock medicines → Medicine Stock tab`);
+    }
+    if (c.doctors.attendancePct < 50 && c.doctors.assigned > 0) {
+      actions.push(`${actions.length + 1}. 👨‍⚕️ Update attendance (${c.doctors.present}/${c.doctors.assigned} recorded) → Overview tab`);
+    }
+    if (c.beds.available === 0 && c.beds.total > 0) {
+      actions.push(`${actions.length + 1}. 🛏️ Update bed status (showing 0 available) → Overview tab`);
+    }
+    if (c.footfall === 0) {
+      actions.push(`${actions.length + 1}. 👥 Record today's patient visits → Overview tab`);
+    }
+
+    if (actions.length === 0) {
+      r += '✅ All data is up to date. Keep recording daily visits and attendance.\n';
+      r += '\nYou can also:\n• Check Medicine Stock for upcoming expiries\n• Schedule a Health Camp\n• Review your Audit Log';
+    } else {
+      r += actions.join('\n');
+    }
+    return r;
+  }
+
+  // District Admin help
+  let r = '📋 Recommended Actions:\n\n';
+  const actions: string[] = [];
+
+  if (flagged.length > 0) {
+    actions.push(`1. ⚠️ Review ${flagged.length} flagged centre(s): ${flagged.map(c => c.name).join(', ')} → Dashboard`);
+  }
+
+  const stockCentres = centres.filter(c => c.medicines.critical.length > 0);
+  if (stockCentres.length > 0) {
+    actions.push(`${actions.length + 1}. 💊 Address medicine shortages at ${stockCentres.length} centre(s) → AI Insights → Redistribution`);
+  }
+
+  const lowStaff = centres.filter(c => c.doctors.attendancePct < 50 && c.doctors.assigned > 0);
+  if (lowStaff.length > 0) {
+    actions.push(`${actions.length + 1}. 👨‍⚕️ Deploy locum staff to: ${lowStaff.map(c => c.name).join(', ')} → Directives`);
+  }
+
+  const fullBeds = centres.filter(c => c.beds.available === 0 && c.beds.total > 0);
+  if (fullBeds.length > 0) {
+    actions.push(`${actions.length + 1}. 🛏️ Arrange patient diversion from: ${fullBeds.map(c => c.name).join(', ')} → Directives`);
+  }
+
+  if (actions.length === 0) {
+    r += '✅ No urgent actions needed. All centres operating normally.\n';
+    r += '\nProactive steps:\n• Review AI Insights for stock-out predictions\n• Schedule health camps for underserved areas\n• Check upcoming medicine expiries';
+  } else {
+    r += actions.join('\n');
+  }
+  return r;
+}
+
+function buildOverviewResponse(centres: CentreData[], isStaff: boolean): string {
+  if (isStaff && centres.length === 1) {
+    return buildCentreDetailResponse(centres[0], isStaff);
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  let r = `📊 District Overview (${today}):\n\n`;
+
+  // Quick stats
+  const totalBeds = centres.reduce((s, c) => s + c.beds.total, 0);
+  const availBeds = centres.reduce((s, c) => s + c.beds.available, 0);
+  const totalDocs = centres.reduce((s, c) => s + c.doctors.assigned, 0);
+  const presentDocs = centres.reduce((s, c) => s + c.doctors.present, 0);
+  const totalFootfall = centres.reduce((s, c) => s + c.footfall, 0);
+  const stockIssues = centres.reduce((s, c) => s + c.medicines.critical.length, 0);
+
+  r += `🛏️ Beds: ${availBeds}/${totalBeds} available across ${centres.length} centres\n`;
+  r += `👨‍⚕️ Doctors: ${presentDocs}/${totalDocs} present (${totalDocs > 0 ? Math.round((presentDocs / totalDocs) * 100) : 0}%)\n`;
+  r += `👥 Patients: ${totalFootfall} total visits today\n`;
+  r += `💊 Stock alerts: ${stockIssues} medicine(s) below reorder level\n`;
+
+  // Per-centre quick view
+  r += '\nPer Centre:\n';
+  for (const c of centres) {
+    const flags = c.issues.length > 0 ? ' ⚠️' : ' ✅';
+    r += `• ${c.name}: Beds ${c.beds.available}/${c.beds.total}, Docs ${c.doctors.present}/${c.doctors.assigned}, Patients ${c.footfall}${flags}\n`;
+  }
+
+  const flagged = centres.filter(c => c.issues.length > 0);
+  if (flagged.length > 0) {
+    r += `\n⚠️ ${flagged.length} centre(s) need attention — ask me "what are the issues" for details.`;
+  } else {
+    r += '\n✅ All centres operating normally.';
+  }
+
+  r += '\n\n💡 Ask me about specific topics: beds, medicines, doctors, patients, or issues.';
+  return r;
+}
+
+
+function formatIssue(issue: string): string {
+  switch (issue) {
+    case 'beds_full': return 'beds at capacity';
+    case 'beds_low': return 'beds running low';
+    case 'low_attendance': return 'low doctor attendance';
+    case 'low_stock': return 'medicine shortage';
+    case 'expiring_stock': return 'medicines expiring soon';
+    default: return issue;
+  }
+}
+
+// ─── Main route handler ───────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
   try {
@@ -409,27 +613,29 @@ export async function POST(request: Request) {
       );
     }
 
-    // Always fetch ALL data for full context (data is small per district)
-    const categories = ['medicines', 'beds', 'attendance', 'footfall', 'evaluation'];
-
-    // Scope data based on role
     const isStaff = role === 'Centre_Staff';
     const scopedCentreId = isStaff && centreId ? centreId : null;
 
-    // Fetch context data from RTDB (scoped to single centre for staff)
-    const contextData = await fetchContextData(districtId, categories, scopedCentreId);
+    // Fetch ALL data — structured and complete
+    const centres = await fetchAllCentreData(districtId, scopedCentreId);
 
-    // Add role context to the prompt
+    // Build context string for Gemini
+    const contextData = buildContextString(centres);
+
+    // Role-specific prompt addition
     const roleContext = isStaff
-      ? `\n\nUSER ROLE: Centre Staff at a single health centre. Only answer about their centre. Give hands-on operational advice (update stock, record attendance, raise indent, etc).`
-      : `\n\nUSER ROLE: District Admin overseeing all centres. Give strategic oversight advice (redistribute resources, deploy staff, schedule inspections, etc).`;
+      ? `\n\nUSER ROLE: Centre Staff at "${centres[0]?.name || 'their centre'}". Only answer about their centre. Give hands-on operational advice (update stock, record attendance, raise indent). Always show their centre's actual numbers.`
+      : `\n\nUSER ROLE: District Admin overseeing ${centres.length} centres. Give strategic oversight with per-centre breakdown. Always show actual numbers for each centre.`;
 
     // Try Gemini first
     let aiResponse: string;
     let source: 'gemini' | 'local' = 'gemini';
 
     try {
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('No API key');
+
+      const genAI = new GoogleGenerativeAI(apiKey);
       const chatModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
       const prompt = `${SYSTEM_PROMPT}${roleContext}\n\nCONTEXT DATA:\n${contextData}\n\nUSER QUESTION: ${question}`;
@@ -443,9 +649,9 @@ export async function POST(request: Request) {
 
       aiResponse = result.response.text();
     } catch {
-      // Gemini unavailable — use local fallback
+      // Gemini unavailable — use robust local fallback
       console.log('Gemini unavailable for chat, using local fallback');
-      aiResponse = generateLocalResponse(question, contextData, isStaff);
+      aiResponse = generateLocalResponse(question, centres, isStaff);
       source = 'local';
     }
 
