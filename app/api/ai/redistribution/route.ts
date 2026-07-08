@@ -59,29 +59,29 @@ export async function POST(request: Request) {
 
     const centreIds = Object.keys(centresMap);
 
-    // Gather data for all centres
+    // Gather data for all centres in parallel
     const centreDataForSufficiency: CentreData[] = [];
     const centreDataForGemini: CentreDataInput[] = [];
+    const today = new Date().toISOString().split('T')[0];
 
-    for (const centreId of centreIds) {
-      // Fetch centre info
-      const centreSnapshot = await adminDatabase
-        .ref(dbPaths.centre(centreId))
-        .once('value');
+    await Promise.all(centreIds.map(async (centreId) => {
+      // Fetch all centre data in parallel
+      const [centreSnapshot, medicinesSnapshot, footfallSnapshot, attendanceSnapshot] = await Promise.all([
+        adminDatabase.ref(dbPaths.centre(centreId)).once('value'),
+        adminDatabase.ref(dbPaths.centreMedicines(centreId)).once('value'),
+        adminDatabase.ref(dbPaths.centreFootfall(centreId)).limitToLast(7).once('value'),
+        adminDatabase.ref(dbPaths.attendance(centreId, today)).once('value'),
+      ]);
+
       const centreInfo = centreSnapshot.val();
-      if (!centreInfo) continue;
+      if (!centreInfo) return;
 
       const centreName = centreInfo.name || centreId;
       const totalBeds = Number(centreInfo.totalBeds ?? 0);
       const availableBeds = Number(centreInfo.availableBeds ?? 0);
       const assignedDoctors = Number(centreInfo.assignedDoctors ?? 0);
 
-      // Fetch medicines
-      const medicinesSnapshot = await adminDatabase
-        .ref(dbPaths.centreMedicines(centreId))
-        .once('value');
       const medicinesMap = medicinesSnapshot.val() || {};
-
       const medicines: MedicineStock[] = Object.entries(medicinesMap).map(
         ([medicineId, data]: [string, unknown]) => {
           const med = data as Record<string, unknown>;
@@ -96,59 +96,31 @@ export async function POST(request: Request) {
         }
       );
 
-      // Fetch footfall (last 7 days)
-      const footfallSnapshot = await adminDatabase
-        .ref(dbPaths.centreFootfall(centreId))
-        .limitToLast(7)
-        .once('value');
       const footfallMap = footfallSnapshot.val() || {};
-
       const footfall: PatientFootfall[] = Object.entries(footfallMap).map(
         ([date, data]: [string, unknown]) => {
           const entry = data as Record<string, unknown>;
-          return {
-            date,
-            centreId,
-            count: Number(entry.count ?? entry ?? 0),
-          };
+          return { date, centreId, count: Number(entry.count ?? entry ?? 0) };
         }
       );
 
-      // Fetch current attendance (today)
-      const today = new Date().toISOString().split('T')[0];
-      const attendanceSnapshot = await adminDatabase
-        .ref(dbPaths.attendance(centreId, today))
-        .once('value');
       const attendanceData = attendanceSnapshot.val();
       const presentDoctors = attendanceData
         ? Number((attendanceData as Record<string, unknown>).presentCount ?? 0)
         : 0;
 
-      // Build sufficiency check data
-      centreDataForSufficiency.push({
-        centreId,
-        medicines,
-        footfall,
-        totalBeds,
-      });
-
-      // Build Gemini input data
+      centreDataForSufficiency.push({ centreId, medicines, footfall, totalBeds });
       centreDataForGemini.push({
         centreId,
         centreName,
-        medicines: medicines.map((m) => ({
-          medicineId: m.medicineId,
-          name: m.name,
-          quantity: m.quantity,
-          reorderLevel: m.reorderLevel,
-        })),
+        medicines: medicines.map((m) => ({ medicineId: m.medicineId, name: m.name, quantity: m.quantity, reorderLevel: m.reorderLevel })),
         footfall: footfall.map((f) => ({ date: f.date, count: f.count })),
         totalBeds,
         availableBeds,
         assignedDoctors,
         presentDoctors,
       });
-    }
+    }));
 
     // Check data sufficiency (Property 17)
     if (!hasMinimumCentresForComparison(centreDataForSufficiency)) {

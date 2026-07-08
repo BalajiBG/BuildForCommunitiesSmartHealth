@@ -49,27 +49,22 @@ export async function POST(request: Request) {
 
     const centreIds = Object.keys(centresMap);
 
-    // For each centre, fetch medicines and consumption data from last 30 days
+    // Fetch all centre data in parallel
     const stockInputs: MedicineStockInput[] = [];
-    const today = new Date();
 
-    for (const centreId of centreIds) {
-      // Fetch centre info
-      const centreSnapshot = await adminDatabase
-        .ref(dbPaths.centre(centreId))
-        .once('value');
+    await Promise.all(centreIds.map(async (centreId) => {
+      // Fetch centre info and medicines in parallel
+      const [centreSnapshot, medicinesSnapshot] = await Promise.all([
+        adminDatabase.ref(dbPaths.centre(centreId)).once('value'),
+        adminDatabase.ref(dbPaths.centreMedicines(centreId)).once('value'),
+      ]);
+
       const centreData = centreSnapshot.val();
-      if (!centreData) continue;
-
+      if (!centreData) return;
       const centreName = centreData.name || centreId;
 
-      // Fetch medicines for this centre
-      const medicinesSnapshot = await adminDatabase
-        .ref(dbPaths.centreMedicines(centreId))
-        .once('value');
       const medicinesMap = medicinesSnapshot.val();
-
-      if (!medicinesMap) continue;
+      if (!medicinesMap) return;
 
       const medicines: MedicineStock[] = Object.entries(medicinesMap).map(
         ([medicineId, data]: [string, unknown]) => {
@@ -85,32 +80,22 @@ export async function POST(request: Request) {
         }
       );
 
-      // Filter medicines for prediction (quantity < reorderLevel * 0.3)
       const candidates = filterMedicinesForPrediction(medicines);
 
-      // Build consumption history for each candidate from last 30 days
-      for (const medicine of candidates) {
-        const consumptionHistory: { date: string; consumed: number }[] = [];
+      // Fetch all consumption data for all candidates in parallel
+      await Promise.all(candidates.map(async (medicine) => {
+        // Fetch entire consumption path for this medicine at once instead of 30 individual calls
+        const consumptionSnap = await adminDatabase
+          .ref(`consumption/${centreId}/${medicine.medicineId}`)
+          .limitToLast(30)
+          .once('value');
 
-        for (let i = 0; i < 30; i++) {
-          const date = new Date(today);
-          date.setDate(date.getDate() - i);
-          const dateStr = date.toISOString().split('T')[0];
+        const consumptionMap = consumptionSnap.val() as Record<string, number> | null;
+        const consumptionHistory: { date: string; consumed: number }[] = consumptionMap
+          ? Object.entries(consumptionMap).map(([date, consumed]) => ({ date, consumed: Number(consumed) }))
+          : [];
 
-          const footfallRef = adminDatabase.ref(
-            `consumption/${centreId}/${medicine.medicineId}/${dateStr}`
-          );
-          const consumptionSnap = await footfallRef.once('value');
-          const consumed = consumptionSnap.val();
-          if (consumed !== null) {
-            consumptionHistory.push({ date: dateStr, consumed: Number(consumed) });
-          }
-        }
-
-        // Check data sufficiency (Property 15)
-        if (hasInsufficientData(consumptionHistory.length)) {
-          continue; // Skip medicines with insufficient data
-        }
+        if (hasInsufficientData(consumptionHistory.length)) return;
 
         stockInputs.push({
           medicineId: medicine.medicineId,
@@ -121,8 +106,8 @@ export async function POST(request: Request) {
           reorderLevel: medicine.reorderLevel,
           consumptionHistory,
         });
-      }
-    }
+      }));
+    }));
 
     if (stockInputs.length === 0) {
       return NextResponse.json({ predictions: [], languageFallback: false });
