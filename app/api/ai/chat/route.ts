@@ -73,6 +73,9 @@ CRITICAL RULES:
 - If data shows zeroes or no data recorded, say so explicitly
 - Interpret the numbers — don't just repeat them. Flag concerning patterns.
 - Be conversational and helpful, like a knowledgeable colleague
+- If user wants to DO something (issue directive, raise indent, update data), give STEP-BY-STEP navigation instructions — not data dumps
+- Understand conversational intent: "u only issue a directive" means the user wants to know HOW to issue a directive, not see issues data
+- Distinguish between "show me issues" (data query) and "issue a directive" (action request)
 
 RESPONSE FORMAT:
 1. Direct answer with actual numbers per centre
@@ -260,15 +263,59 @@ function generateLocalResponse(question: string, centres: CentreData[], isStaff:
 
   const q = question.toLowerCase();
 
+  // Detect navigation/action requests FIRST (before category detection)
+  const askingNavigation = /how (do i|to|can i)|where (do i|can i|is)|take me|go to|navigate|open|show me (the|how)/.test(q);
+  const askingDirective = /directive|order|notice|instruct|circular/.test(q);
+  const askingAction = /issue a|create a|send a|raise a|file a|submit|write a|make a|u only|you only/.test(q);
+
+  // Handle explicit navigation requests
+  if (askingNavigation) {
+    if (q.includes('directive') || q.includes('order')) return buildNavigationResponse('directives', isStaff);
+    if (q.includes('insight') || q.includes('predict')) return buildNavigationResponse('insights', isStaff);
+    if (q.includes('stock') || q.includes('indent') || q.includes('medicine')) return buildNavigationResponse('stock', isStaff);
+  }
+  const isConversational = /^(ok|okay|thanks|thank you|got it|cool|nice|great|good|yes|no|hmm|sure|alright|right|fine|i see|understood)/.test(q);
+  const isShortMessage = q.length < 60;
+
   // Detect which category the user is asking about
-  const askingBeds = /bed|capacity|occupan|admit|ward|room/.test(q);
-  const askingMeds = /medicine|stock|drug|tablet|expire|expiry|indent|pharma|supply|shortage/.test(q);
+  const askingBeds = /bed|capacity|occupan|admit|ward|room|available bed|free bed/.test(q);
+  const askingMeds = /medicine|stock|drug|tablet|expire|expiry|indent|pharma|supply|shortage|dawai|dawa/.test(q);
   const askingDoctors = /doctor|staff|attend|absent|present|nurse|manpower/.test(q);
   const askingFootfall = /footfall|patient|visit|opd|rush|crowd|load|traffic/.test(q);
-  const askingIssues = /issue|problem|critical|alert|flag|urgent|underperform|worst|bad|concern|risk|priority|emergency/.test(q);
-  const askingHelp = /help|what can|what should|suggest|recommend|advise|guide|todo|to do/.test(q);
-  const askingOverview = /overview|summary|status|how.*doing|how.*things|report|dashboard|everything|all/.test(q);
+  const askingIssues = /\b(issue|problem|critical|alert|flag|urgent|underperform|worst|bad|concern|risk|priority|emergency)\b/.test(q) && !askingDirective && !askingAction;
+  const askingHelp = /help|what can|what should|suggest|recommend|advise|guide|todo|to do|kya karu|kya karun/.test(q);
+  const askingOverview = /overview|summary|status|how.*doing|how.*things|report|dashboard|everything|all|sab kuch/.test(q);
   const askingSpecificCentre = centres.find(c => q.includes(c.name.toLowerCase()));
+
+  // If user wants to DO something (not query data), give navigation guidance
+  if (askingDirective && !(/what are|which|show me all|list all|how many|any pending|show.*directive/.test(q))) {
+    return buildNavigationResponse('directives', isStaff);
+  }
+  if (askingAction && askingMeds) {
+    return buildNavigationResponse('stock', isStaff);
+  }
+  if (askingAction && askingDirective) {
+    return buildNavigationResponse('directives', isStaff);
+  }
+
+  // Handle conversational follow-ups that aren't data queries
+  if (isConversational && isShortMessage && !askingBeds && !askingMeds && !askingDoctors && !askingFootfall) {
+    // Short conversational message — check if it's about navigation
+    if (q.includes('directive') || q.includes('order')) return buildNavigationResponse('directives', isStaff);
+    if (q.includes('insight') || q.includes('predict')) return buildNavigationResponse('insights', isStaff);
+    if (q.includes('stock') || q.includes('indent') || q.includes('medicine')) return buildNavigationResponse('stock', isStaff);
+    // Generic acknowledgment — offer help
+    return `👍 Got it! What else can I help you with?\n\nI can show you:\n• Bed availability across centres\n• Medicine stock status\n• Doctor attendance\n• Patient footfall\n• Flagged issues\n\nOr tell me what action you'd like to take (issue directive, raise indent, etc.)`;
+  }
+
+  // Handle greetings
+  if (/^(hi|hello|hey|namaste|good morning|good evening|howdy)/.test(q) && isShortMessage) {
+    const flagged = centres.filter(c => c.issues.length > 0);
+    if (flagged.length > 0) {
+      return `👋 Hello! Here's a quick update:\n\n⚠️ ${flagged.length} centre(s) need attention today.\n\nAsk me about beds, medicines, doctors, or say "what are the issues" for details.`;
+    }
+    return `👋 Hello! All ${centres.length} centres are running normally today.\n\nAsk me about beds, medicines, doctors, patient footfall, or say "what should I do" for suggestions.`;
+  }
 
   // ─── Specific centre query ─────────────────────────────────────────────────
   if (askingSpecificCentre) {
@@ -599,6 +646,25 @@ function formatIssue(issue: string): string {
   }
 }
 
+function buildNavigationResponse(target: string, isStaff: boolean): string {
+  switch (target) {
+    case 'directives':
+      if (isStaff) {
+        return '📋 Directives are issued by the District Admin to your centre.\n\nYou can view any directives sent to you from the Directives page in the sidebar.\n\n💡 If you need to request resources or flag an issue, raise an indent from the Medicine Stock tab or update your centre data in the Overview tab — the District Admin will see alerts.';
+      }
+      return '📋 To Issue a Directive:\n\n1. Go to the Directives page from the sidebar\n2. Click "Issue New Directive"\n3. Select the target centre\n4. Choose the action type (stock indent, staff deployment, capacity alert, etc.)\n5. Add instructions and submit\n\nThe centre staff will see the directive immediately.\n\n💡 You can also click a specific centre card on Dashboard → then issue a directive directly for that centre.';
+    case 'insights':
+      return '📋 AI Insights Page:\n\nGo to AI Insights from the sidebar to see:\n• Stock-out predictions (when medicines will run out)\n• Redistribution recommendations (move stock between centres)\n\n💡 These are AI-generated based on consumption trends.';
+    case 'stock':
+      if (isStaff) {
+        return '📋 To manage medicines:\n\n1. Go to your Centre → Medicine Stock tab\n2. View current stock levels\n3. Click "Raise Emergency Indent" for low items\n4. Update quantities after receiving stock\n\n💡 Keep stock data updated daily for accurate AI predictions.';
+      }
+      return '📋 To review stock across centres:\n\n1. Click any centre card on Dashboard\n2. Go to Medicine Stock tab\n3. Or visit AI Insights for predictions and redistribution\n\n💡 Issue Directives for centres with critical shortages.';
+    default:
+      return '📋 Use the sidebar to navigate:\n• Dashboard — overview of all centres\n• AI Insights — predictions & redistribution\n• AI Assistant — this chat\n• Contacts — phone directory\n• Directives — issue action orders\n\n💡 Click any centre card for detailed data.';
+  }
+}
+
 // ─── Main route handler ───────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
@@ -628,29 +694,48 @@ export async function POST(request: Request) {
       : `\n\nUSER ROLE: District Admin overseeing ${centres.length} centres. Give strategic oversight with per-centre breakdown. Always show actual numbers for each centre.`;
 
     // Try Gemini first
-    let aiResponse: string;
+    let aiResponse: string = '';
     let source: 'gemini' | 'local' = 'gemini';
 
     try {
       const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error('No API key');
+      if (!apiKey) throw new Error('No GEMINI_API_KEY env var set');
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const chatModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
       const prompt = `${SYSTEM_PROMPT}${roleContext}\n\nCONTEXT DATA:\n${contextData}\n\nUSER QUESTION: ${question}`;
 
-      const result = await Promise.race([
-        chatModel.generateContent(prompt),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Gemini timeout')), 15000)
-        ),
-      ]);
+      // Try primary model, then lite model, with retries
+      const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+      let lastError: unknown;
 
-      aiResponse = result.response.text();
-    } catch {
-      // Gemini unavailable — use robust local fallback
-      console.log('Gemini unavailable for chat, using local fallback');
+      for (const modelName of models) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const chatModel = genAI.getGenerativeModel({ model: modelName });
+            const result = await Promise.race([
+              chatModel.generateContent(prompt),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error(`${modelName} timeout`)), 12000)
+              ),
+            ]);
+
+            aiResponse = result.response.text();
+            if (!aiResponse || aiResponse.trim().length < 10) {
+              throw new Error('Empty response');
+            }
+            break; // Success
+          } catch (retryError) {
+            lastError = retryError;
+            if (attempt < 1) await new Promise(r => setTimeout(r, 1000));
+          }
+        }
+        if (aiResponse) break; // Got a response, stop trying models
+      }
+
+      if (!aiResponse) throw lastError || new Error('All models failed');
+    } catch (geminiError) {
+      const errMsg = geminiError instanceof Error ? geminiError.message : String(geminiError);
+      console.log(`Gemini unavailable for chat (${errMsg}), using local engine`);
       aiResponse = generateLocalResponse(question, centres, isStaff);
       source = 'local';
     }
