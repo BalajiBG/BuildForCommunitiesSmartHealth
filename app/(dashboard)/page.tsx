@@ -251,6 +251,7 @@ function DetailPanel({ metrics, onClose }: DetailPanelProps) {
 
 function DistrictDashboardContent() {
   const { profile } = useAuth();
+  const router = useRouter();
   const t = useTranslations('dashboard');
   const tEval = useTranslations('evaluation');
 
@@ -570,7 +571,7 @@ function DistrictDashboardContent() {
                 footfallCount={metrics.footfallCount}
                 isUnderperforming={evaluation?.isUnderperforming}
                 breachedMetrics={evaluation?.breachedMetrics}
-                onClick={(id) => setSelectedCentreId(id)}
+                onClick={(id) => router.push(`/centre/${id}`)}
                 isSelected={metrics.centre.id === selectedCentreId}
               />
             );
