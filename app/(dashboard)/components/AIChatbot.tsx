@@ -110,6 +110,42 @@ export function AIChatbot() {
     }
   };
 
+  /** Render simple markdown: bold, bullets, headers */
+  const renderMarkdown = (text: string) => {
+    const lines = text.split('\n');
+    return lines.map((line, i) => {
+      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+      const rendered = parts.map((part, j) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={j}>{part.slice(2, -2)}</strong>;
+        }
+        return <span key={j}>{part}</span>;
+      });
+
+      if (line.match(/^[\s]*[-•*]\s/)) {
+        const content = line.replace(/^[\s]*[-•*]\s/, '');
+        const contentParts = content.split(/(\*\*[^*]+\*\*)/g).map((part, j) => {
+          if (part.startsWith('**') && part.endsWith('**')) return <strong key={j}>{part.slice(2, -2)}</strong>;
+          return <span key={j}>{part}</span>;
+        });
+        return <div key={i} className="flex gap-1 ml-1"><span className="text-gray-400 shrink-0">•</span><span>{contentParts}</span></div>;
+      }
+
+      if (line.match(/^\d+\.\s/)) {
+        const num = line.match(/^(\d+)\./)?.[1];
+        const content = line.replace(/^\d+\.\s/, '');
+        const contentParts = content.split(/(\*\*[^*]+\*\*)/g).map((part, j) => {
+          if (part.startsWith('**') && part.endsWith('**')) return <strong key={j}>{part.slice(2, -2)}</strong>;
+          return <span key={j}>{part}</span>;
+        });
+        return <div key={i} className="flex gap-1 ml-1"><span className="text-indigo-500 font-medium shrink-0">{num}.</span><span>{contentParts}</span></div>;
+      }
+
+      if (line.trim() === '') return <div key={i} className="h-1.5" />;
+      return <div key={i}>{rendered}</div>;
+    });
+  };
+
   const toggleChat = () => {
     setIsOpen(!isOpen);
     if (!isOpen) {
@@ -152,13 +188,13 @@ export function AIChatbot() {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                  className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
                     msg.role === 'user'
-                      ? 'bg-indigo-600 text-white'
+                      ? 'bg-indigo-600 text-white whitespace-pre-wrap'
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >
-                  {msg.content}
+                  {msg.role === 'user' ? msg.content : renderMarkdown(msg.content)}
                 </div>
               </div>
             ))}

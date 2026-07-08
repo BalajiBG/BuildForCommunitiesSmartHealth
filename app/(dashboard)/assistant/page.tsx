@@ -103,6 +103,53 @@ export default function AIAssistantPage() {
     }
   };
 
+  /** Render simple markdown: bold, bullets, headers */
+  const renderMarkdown = (text: string) => {
+    const lines = text.split('\n');
+    return lines.map((line, i) => {
+      // Process inline bold **text**
+      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+      const rendered = parts.map((part, j) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={j}>{part.slice(2, -2)}</strong>;
+        }
+        return <span key={j}>{part}</span>;
+      });
+
+      // Headers
+      if (line.startsWith('### ')) return <h4 key={i} className="font-semibold text-sm mt-2 mb-1">{line.slice(4)}</h4>;
+      if (line.startsWith('## ')) return <h3 key={i} className="font-semibold text-base mt-2 mb-1">{line.slice(3)}</h3>;
+
+      // Bullet points
+      if (line.match(/^[\s]*[-•*]\s/)) {
+        const content = line.replace(/^[\s]*[-•*]\s/, '');
+        const indent = line.match(/^(\s*)/)?.[1]?.length ?? 0;
+        const contentParts = content.split(/(\*\*[^*]+\*\*)/g).map((part, j) => {
+          if (part.startsWith('**') && part.endsWith('**')) return <strong key={j}>{part.slice(2, -2)}</strong>;
+          return <span key={j}>{part}</span>;
+        });
+        return <div key={i} className="flex gap-1.5" style={{ paddingLeft: `${Math.min(indent, 4) * 4}px` }}><span className="text-gray-400 shrink-0">•</span><span>{contentParts}</span></div>;
+      }
+
+      // Numbered lists
+      if (line.match(/^\d+\.\s/)) {
+        const num = line.match(/^(\d+)\./)?.[1];
+        const content = line.replace(/^\d+\.\s/, '');
+        const contentParts = content.split(/(\*\*[^*]+\*\*)/g).map((part, j) => {
+          if (part.startsWith('**') && part.endsWith('**')) return <strong key={j}>{part.slice(2, -2)}</strong>;
+          return <span key={j}>{part}</span>;
+        });
+        return <div key={i} className="flex gap-1.5"><span className="text-indigo-500 font-medium shrink-0">{num}.</span><span>{contentParts}</span></div>;
+      }
+
+      // Empty line = spacing
+      if (line.trim() === '') return <div key={i} className="h-2" />;
+
+      // Normal line with bold support
+      return <div key={i}>{rendered}</div>;
+    });
+  };
+
   // Suggested questions based on role
   const suggestions = isStaff
     ? ['What medicines are low?', 'How many patients today?', 'Any directives for me?']
@@ -135,13 +182,13 @@ export default function AIAssistantPage() {
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed ${
+              className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === 'user'
                   ? 'bg-indigo-600 text-white rounded-br-md'
                   : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md shadow-sm'
               }`}
             >
-              {msg.content}
+              {msg.role === 'user' ? msg.content : renderMarkdown(msg.content)}
             </div>
           </div>
         ))}

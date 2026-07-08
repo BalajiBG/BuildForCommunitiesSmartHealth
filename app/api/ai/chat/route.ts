@@ -73,14 +73,16 @@ CRITICAL RULES:
 - If data shows zeroes or no data recorded, say so explicitly
 - Interpret the numbers — don't just repeat them. Flag concerning patterns.
 - Be conversational and helpful, like a knowledgeable colleague
+- For greetings/casual messages (hi, hello, how are you, thanks): Be warm and brief. Say hello, mention if anything needs attention in 1 line, and ask how you can help. Do NOT list all centre data unless asked.
 - If user wants to DO something (issue directive, raise indent, update data), give STEP-BY-STEP navigation instructions — not data dumps
 - Understand conversational intent: "u only issue a directive" means the user wants to know HOW to issue a directive, not see issues data
 - Distinguish between "show me issues" (data query) and "issue a directive" (action request)
 
 RESPONSE FORMAT:
-1. Direct answer with actual numbers per centre
-2. Flag any concerns (low stock, high occupancy, low attendance)
-3. One actionable recommendation with exact page/tab to visit
+1. For greetings (hi, hello, how are you): Reply with a brief friendly greeting + ask what they'd like help with. Do NOT dump data unprompted.
+2. For data questions: Direct answer with actual numbers per centre
+3. Flag any concerns (low stock, high occupancy, low attendance)
+4. One actionable recommendation with exact page/tab to visit
 
 APP NAVIGATION GUIDE:
 - Dashboard: overview of all centres, click a centre card for details
@@ -309,12 +311,12 @@ function generateLocalResponse(question: string, centres: CentreData[], isStaff:
   }
 
   // Handle greetings
-  if (/^(hi|hello|hey|namaste|good morning|good evening|howdy)/.test(q) && isShortMessage) {
+  if (/^(hi|hello|hey|namaste|good morning|good evening|howdy|how are you|how r u|hii|helo|sup|wassup|whats up)/.test(q) && isShortMessage) {
     const flagged = centres.filter(c => c.issues.length > 0);
     if (flagged.length > 0) {
-      return `👋 Hello! Here's a quick update:\n\n⚠️ ${flagged.length} centre(s) need attention today.\n\nAsk me about beds, medicines, doctors, or say "what are the issues" for details.`;
+      return `👋 Hello! I'm doing well, ready to help.\n\nQuick update: ⚠️ ${flagged.length} of ${centres.length} centres need attention today.\n\nWhat would you like to know? Try:\n• "Show bed availability"\n• "Any medicine shortages?"\n• "Which centres have issues?"`;
     }
-    return `👋 Hello! All ${centres.length} centres are running normally today.\n\nAsk me about beds, medicines, doctors, patient footfall, or say "what should I do" for suggestions.`;
+    return `👋 Hello! I'm your AI health assistant, ready to help.\n\nAll ${centres.length} centres are running today. What would you like to know?\n\n• Bed availability\n• Medicine stock\n• Doctor attendance\n• Patient footfall\n• Issues & alerts`;
   }
 
   // ─── Specific centre query ─────────────────────────────────────────────────
@@ -705,7 +707,7 @@ export async function POST(request: Request) {
       const prompt = `${SYSTEM_PROMPT}${roleContext}\n\nCONTEXT DATA:\n${contextData}\n\nUSER QUESTION: ${question}`;
 
       // Try primary model, then lite model, with retries
-      const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+      const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
       let lastError: unknown;
 
       for (const modelName of models) {
