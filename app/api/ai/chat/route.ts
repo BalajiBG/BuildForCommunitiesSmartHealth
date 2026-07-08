@@ -298,11 +298,65 @@ function generateLocalResponse(_question: string, contextData: string, isStaff?:
     return response.trim();
   }
 
-  // General district-wide summary (no specific centre mentioned)
+  // General summary — for Centre Staff this is already scoped to their centre
   const hasStockIssues = contextData.includes('below reorder') || contextData.includes('expiring');
   const hasBedIssues = contextData.includes('0/') && contextData.includes('beds');
   const hasStaffIssues = contextData.includes('low attendance');
 
+  // For Centre Staff: give direct, specific answers from their centre's data
+  if (isStaff) {
+    // Check if question is about medicines/stock
+    if (q.includes('medicine') || q.includes('stock') || q.includes('low') || q.includes('indent') || q.includes('drug')) {
+      const stockSection = contextData.split('MEDICINE STOCK:')[1]?.split('\n\n')[0]?.trim() || '';
+      if (!stockSection || stockSection.includes('adequate')) {
+        return '✅ All medicines at your centre are above minimum required levels. No action needed.';
+      }
+      // Extract specific medicine names from the Critical: section
+      const criticalMatch = stockSection.match(/Critical: (.+)/);
+      if (criticalMatch) {
+        const medicines = criticalMatch[1].split('), ').map(m => '• ' + m.trim().replace(/\)$/, ')'));
+        return `⚠️ Low Stock at Your Centre:\n\n${medicines.join('\n')}\n\n💡 Go to Medicine Stock tab → click "Raise Emergency Indent" for each.`;
+      }
+      return `⚠️ Your centre has medicines below minimum levels.\n\n💡 Go to Medicine Stock tab to see details and raise indent.`;
+    }
+
+    // Beds question
+    if (q.includes('bed') || q.includes('capacity')) {
+      const bedSection = contextData.split('BED AVAILABILITY:')[1]?.split('\n\n')[0]?.trim() || '';
+      if (bedSection) {
+        return `🛏️ Your Centre Beds:\n\n• ${bedSection.split('\n')[0]?.split(':')[1]?.trim() || 'Data available in Overview tab'}\n\n💡 Go to Overview tab to update availability.`;
+      }
+    }
+
+    // Attendance
+    if (q.includes('doctor') || q.includes('staff') || q.includes('attend')) {
+      const attSection = contextData.split('DOCTOR ATTENDANCE')[1]?.split('\n\n')[0]?.trim() || '';
+      if (attSection) {
+        return `👨‍⚕️ Today's Attendance:\n\n• ${attSection.split('\n')[0]?.split(':')[1]?.trim() || 'Check Overview tab'}\n\n💡 Go to Overview tab to record today's attendance.`;
+      }
+    }
+
+    // Footfall/patients
+    if (q.includes('patient') || q.includes('footfall') || q.includes('visit') || q.includes('today')) {
+      const ffSection = contextData.split('PATIENT FOOTFALL')[1]?.split('\n\n')[0]?.trim() || '';
+      if (ffSection) {
+        return `👥 Today's Patients:\n\n• ${ffSection.split('\n')[0]?.split(':')[1]?.trim() || '0'}\n\n💡 Record new visits in the Overview tab using "Record Patient Visit" form.`;
+      }
+    }
+
+    // General "what should I do" or unrecognized
+    const issues: string[] = [];
+    if (hasStockIssues) issues.push('💊 Some medicines are below minimum → Medicine Stock tab');
+    if (hasBedIssues) issues.push('🛏️ Beds at capacity → Update in Overview tab');
+    if (hasStaffIssues) issues.push('👨‍⚕️ Low attendance → Record in Overview tab');
+
+    if (issues.length === 0) {
+      return '✅ Your centre is running smoothly today.\n\nAll stock, beds, and attendance are within normal levels.';
+    }
+    return `📋 Your Centre Today:\n\n${issues.join('\n')}\n\n💡 Address each item using the tab mentioned.`;
+  }
+
+  // District Admin — general district-wide summary
   const urgentItems: string[] = [];
   const okItems: string[] = [];
 
