@@ -6,15 +6,16 @@ import { database } from '@/lib/firebase/client';
 import { dbPaths } from '@/lib/firebase/types';
 import { useAuth } from '@/lib/contexts/AuthProvider';
 import { logAudit } from '@/lib/services/audit';
+import { t } from '@/lib/i18n/translations';
 import type { Directive, DirectiveType, DirectivePriority } from '@/lib/types';
 
-const DIRECTIVE_TYPE_LABELS: Record<DirectiveType, string> = {
-  indent: 'Emergency Indent',
-  staff_rotation: 'Staff Rotation',
-  inspection: 'Inspection',
-  patient_diversion: 'Patient Diversion',
-  equipment_request: 'Equipment Request',
-  general: 'General',
+const DIRECTIVE_TYPE_KEYS: Record<DirectiveType, string> = {
+  indent: 'directive_indent',
+  staff_rotation: 'directive_staff_rotation',
+  inspection: 'directive_inspection',
+  patient_diversion: 'directive_patient_diversion',
+  equipment_request: 'directive_equipment_request',
+  general: 'directive_general',
 };
 
 const PRIORITY_COLOURS: Record<DirectivePriority, { bg: string; text: string; border: string }> = {
@@ -38,6 +39,7 @@ interface CentreOption {
 
 export default function DirectivesPage() {
   const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [directives, setDirectives] = useState<Directive[]>([]);
   const [centres, setCentres] = useState<CentreOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,28 +164,28 @@ export default function DirectivesPage() {
   if (profile?.role !== 'District_Admin') {
     return (
       <div className="p-6">
-        <p className="text-gray-500">Only District Admins can access this page.</p>
+        <p className="text-gray-500">{t('only_district_admin', lang)}</p>
       </div>
     );
   }
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900">Admin Directives</h1>
-      <p className="text-sm text-gray-500">Issue actionable directives to health centres in your district.</p>
+      <h1 className="text-2xl font-bold text-gray-900">{t('admin_directives', lang)}</h1>
+      <p className="text-sm text-gray-500">{t('directives_desc', lang)}</p>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-sm text-gray-500">Total Active</p>
+          <p className="text-sm text-gray-500">{t('total_active', lang)}</p>
           <p className="text-2xl font-bold text-gray-900">{activeDirectives.length}</p>
         </div>
         <div className="bg-white rounded-xl border border-red-200 p-4">
-          <p className="text-sm text-red-600">Critical</p>
+          <p className="text-sm text-red-600">{t('critical', lang)}</p>
           <p className="text-2xl font-bold text-red-700">{criticalActive.length}</p>
         </div>
         <div className="bg-white rounded-xl border border-green-200 p-4">
-          <p className="text-sm text-green-600">Completed Today</p>
+          <p className="text-sm text-green-600">{t('completed_today', lang)}</p>
           <p className="text-2xl font-bold text-green-700">{completedToday.length}</p>
         </div>
       </div>
@@ -194,7 +196,7 @@ export default function DirectivesPage() {
           onClick={() => setFormOpen(!formOpen)}
           className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
         >
-          <span className="font-semibold text-gray-900">Create New Directive</span>
+          <span className="font-semibold text-gray-900">{t('create_new_directive', lang)}</span>
           <svg
             className={`w-5 h-5 text-gray-400 transition-transform ${formOpen ? 'rotate-180' : ''}`}
             fill="none"
@@ -211,21 +213,21 @@ export default function DirectivesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('type', lang)}</label>
                 <select
                   value={formType}
                   onChange={(e) => setFormType(e.target.value as DirectiveType)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
-                  {Object.entries(DIRECTIVE_TYPE_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
+                  {Object.entries(DIRECTIVE_TYPE_KEYS).map(([key, tKey]) => (
+                    <option key={key} value={key}>{t(tKey, lang)}</option>
                   ))}
                 </select>
               </div>
 
               {/* Priority */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('priority', lang)}</label>
                 <select
                   value={formPriority}
                   onChange={(e) => setFormPriority(e.target.value as DirectivePriority)}
@@ -240,7 +242,7 @@ export default function DirectivesPage() {
 
             {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('title', lang)}</label>
               <input
                 type="text"
                 value={formTitle}
@@ -253,7 +255,7 @@ export default function DirectivesPage() {
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('description', lang)}</label>
               <textarea
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
@@ -266,14 +268,14 @@ export default function DirectivesPage() {
 
             {/* Target Centre */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Target Centre</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('target_centre', lang)}</label>
               <select
                 value={formTargetCentre}
                 onChange={(e) => setFormTargetCentre(e.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
-                <option value="">Select a centre...</option>
+                <option value="">{t('select_a_centre', lang)}</option>
                 {centres.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
@@ -285,7 +287,7 @@ export default function DirectivesPage() {
               disabled={submitting || !formTitle.trim() || !formDescription.trim() || !formTargetCentre}
               className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {submitting ? 'Issuing...' : 'Issue Directive'}
+              {submitting ? t('issuing', lang) : t('issue_directive_btn', lang)}
             </button>
           </form>
         )}
@@ -298,14 +300,14 @@ export default function DirectivesPage() {
         </div>
       ) : directives.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
-          <p>No directives issued yet. Create your first directive above.</p>
+          <p>{t('no_directives_yet', lang)}</p>
         </div>
       ) : (
         <div className="space-y-6">
           {/* Active Directives */}
           {activeDirectives.length > 0 && (
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Active Directives</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">{t('active_directives_heading', lang)}</h2>
               <div className="space-y-3">
                 {activeDirectives.map((d) => (
                   <DirectiveCard key={d.id} directive={d} onMarkCompleted={handleMarkCompleted} />
@@ -317,7 +319,7 @@ export default function DirectivesPage() {
           {/* Completed / Rejected */}
           {directives.filter((d) => d.status === 'completed' || d.status === 'rejected').length > 0 && (
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Completed / Closed</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">{t('completed_closed', lang)}</h2>
               <div className="space-y-3">
                 {directives
                   .filter((d) => d.status === 'completed' || d.status === 'rejected')
@@ -340,9 +342,49 @@ function DirectiveCard({
   directive: Directive;
   onMarkCompleted: (d: Directive) => void;
 }) {
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
+  const [translatedCache, setTranslatedCache] = useState<Record<string, string>>({});
   const priority = PRIORITY_COLOURS[directive.priority];
   const status = STATUS_BADGES[directive.status] ?? STATUS_BADGES.issued;
   const isActive = directive.status !== 'completed' && directive.status !== 'rejected';
+
+  const translateText = (text: string): string => {
+    if (lang === 'en') return text;
+    const map: Record<string, string> = {
+      'Discuss about dental camp': 'दंत शिविर के बारे में चर्चा करें',
+      'give all the advertisement planning to get more beneficiaries for dental camp': 'दंत शिविर के लिए अधिक लाभार्थी प्राप्त करने हेतु विज्ञापन योजना दें',
+      'plan on health camp': 'स्वास्थ्य शिविर की योजना बनाएं',
+      'come up with beneficiary details': 'लाभार्थी विवरण तैयार करें',
+      'Emergency Insulin supply for CHC Anand': 'CHC आनंद के लिए आपातकालीन इंसुलिन आपूर्ति',
+      'Arrange emergency insulin supply from district warehouse': 'जिला गोदाम से आपातकालीन इंसुलिन आपूर्ति की व्यवस्था करें',
+      'Rotate 1 MO from PHC Petlad to PHC Khambhat': 'PHC पेटलाद से 1 MO PHC खंभात में स्थानांतरित करें',
+      'PHC Khambhat is critically understaffed. Deploy 1 Medical Officer from PHC Petlad temporarily.': 'PHC खंभात में गंभीर कर्मचारी कमी है। PHC पेटलाद से 1 चिकित्सा अधिकारी अस्थायी तैनात करें।',
+      'Quarterly inspection of PHC Borsad cold chain': 'PHC बोरसद कोल्ड चेन का तिमाही निरीक्षण',
+      'Schedule and conduct quarterly cold chain inspection at PHC Borsad': 'PHC बोरसद में तिमाही कोल्ड चेन निरीक्षण निर्धारित और संचालित करें',
+      'Dr. Patel from PHC Petlad has been notified. Will report tomorrow morning.': 'PHC पेटलाद के डॉ. पटेल को सूचित किया गया। कल सुबह रिपोर्ट करेंगे।',
+      'Infrastructure audit planning and report': 'अवसंरचना ऑडिट योजना और रिपोर्ट',
+      'provide all infra details and report for the year by next week': 'अगले सप्ताह तक वर्ष की सभी अवसंरचना विवरण और रिपोर्ट प्रदान करें',
+    };
+    if (map[text]) return map[text];
+    const lower = text.toLowerCase();
+    for (const [k, v] of Object.entries(map)) {
+      if (k.toLowerCase() === lower) return v;
+    }
+    // Fallback: call translate API asynchronously
+    if (!translatedCache[text]) {
+      fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, targetLang: 'hi' }),
+      }).then(r => r.json()).then(data => {
+        if (data.translated && data.translated !== text) {
+          setTranslatedCache(prev => ({ ...prev, [text]: data.translated }));
+        }
+      }).catch(() => {});
+    }
+    return translatedCache[text] || text;
+  };
 
   return (
     <div className={`rounded-xl border ${priority.border} ${priority.bg} p-4`}>
@@ -351,23 +393,23 @@ function DirectiveCard({
           <div className="flex flex-wrap items-center gap-2 mb-1">
             {/* Type Badge */}
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">
-              {DIRECTIVE_TYPE_LABELS[directive.type]}
+              {t(DIRECTIVE_TYPE_KEYS[directive.type], lang)}
             </span>
             {/* Priority Badge */}
             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${priority.text}`}>
-              {directive.priority.toUpperCase()}
+              {lang === 'hi' ? (directive.priority === 'critical' ? 'गंभीर' : directive.priority === 'high' ? 'उच्च' : 'सामान्य') : directive.priority.toUpperCase()}
             </span>
             {/* Status Badge */}
             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${status.bg} ${status.text}`}>
-              {directive.status.replace('_', ' ')}
+              {lang === 'hi' ? (directive.status === 'issued' ? 'जारी' : directive.status === 'acknowledged' ? 'स्वीकृत' : directive.status === 'in_progress' ? 'प्रगति में' : directive.status === 'completed' ? 'पूर्ण' : directive.status) : directive.status.replace('_', ' ')}
             </span>
           </div>
-          <h3 className="font-semibold text-gray-900 text-sm">{directive.title}</h3>
-          <p className="text-xs text-gray-600 mt-1">{directive.description}</p>
+          <h3 className="font-semibold text-gray-900 text-sm">{translateText(directive.title)}</h3>
+          <p className="text-xs text-gray-600 mt-1">{translateText(directive.description)}</p>
           <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
             <span>📍 {directive.targetCentreName}</span>
             <span>🕒 {new Date(directive.issuedAt).toLocaleString()}</span>
-            {directive.remarks && <span>💬 {directive.remarks}</span>}
+            {directive.remarks && <span>💬 {translateText(directive.remarks)}</span>}
           </div>
         </div>
 
@@ -377,7 +419,7 @@ function DirectiveCard({
             onClick={() => onMarkCompleted(directive)}
             className="shrink-0 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
-            Mark Completed
+            {t('mark_completed', lang)}
           </button>
         )}
       </div>

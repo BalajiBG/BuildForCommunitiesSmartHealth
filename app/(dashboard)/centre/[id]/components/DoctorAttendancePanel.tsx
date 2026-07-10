@@ -7,6 +7,8 @@ import { dbPaths } from '@/lib/firebase/types';
 import { validateDoctorAttendance } from '@/lib/services/validation';
 import { isUnderstaffed } from '@/lib/services/alert';
 import { useAuditLog } from '@/lib/hooks/useAuditLog';
+import { t } from '@/lib/i18n/translations';
+import { useAuth } from '@/lib/contexts/AuthProvider';
 
 interface DoctorAttendancePanelProps {
   centreId: string;
@@ -32,6 +34,8 @@ function getTodayDate(): string {
  * Validates: Requirements 6.1, 6.2, 6.3, 6.4
  */
 export default function DoctorAttendancePanel({ centreId, readOnly = false }: DoctorAttendancePanelProps) {
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [assignedDoctors, setAssignedDoctors] = useState<number>(0);
   const [presentCount, setPresentCount] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState<string>('');
@@ -107,7 +111,7 @@ export default function DoctorAttendancePanel({ centreId, readOnly = false }: Do
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Doctor Attendance</h3>
+        <h3 className="text-lg font-semibold text-gray-900">{t('doctor_attendance', lang)}</h3>
         {understaffed && (
           <span
             className="inline-flex items-center gap-1 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800"
@@ -126,7 +130,7 @@ export default function DoctorAttendancePanel({ centreId, readOnly = false }: Do
                 clipRule="evenodd"
               />
             </svg>
-            Understaffed
+            {t('understaffed', lang)}
           </span>
         )}
       </div>
@@ -140,7 +144,7 @@ export default function DoctorAttendancePanel({ centreId, readOnly = false }: Do
           <span className="text-lg text-gray-500">/ {assignedDoctors}</span>
         </div>
         <p className="text-sm text-gray-600 mt-1">
-          Doctors present today ({today})
+          {t('doctors_present_today', lang)} ({today})
         </p>
       </div>
 
@@ -152,7 +156,7 @@ export default function DoctorAttendancePanel({ centreId, readOnly = false }: Do
               htmlFor={`attendance-input-${centreId}`}
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Record today&apos;s attendance
+              {t('record_attendance', lang)}
             </label>
             <div className="flex gap-2">
               <input
@@ -175,7 +179,7 @@ export default function DoctorAttendancePanel({ centreId, readOnly = false }: Do
                 disabled={saving || inputValue === ''}
                 className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? t('saving', lang) : t('save', lang)}
               </button>
             </div>
           </div>
@@ -192,7 +196,7 @@ export default function DoctorAttendancePanel({ centreId, readOnly = false }: Do
 
           {saveSuccess && (
             <p className="text-sm text-green-600" role="status">
-              Attendance recorded successfully.
+              {t('attendance_recorded', lang)}
             </p>
           )}
         </form>

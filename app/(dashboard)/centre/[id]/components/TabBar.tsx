@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 
 export type CentreTab = 'overview' | 'infrastructure' | 'stock' | 'camps' | 'audit';
 
@@ -9,12 +10,12 @@ interface TabBarProps {
   onTabChange: (tab: CentreTab) => void;
 }
 
-const TABS: { id: CentreTab; label: string; icon: string }[] = [
-  { id: 'overview', label: 'Overview', icon: '📊' },
-  { id: 'infrastructure', label: 'Infrastructure', icon: '🏥' },
-  { id: 'stock', label: 'Medicine Stock', icon: '💊' },
-  { id: 'camps', label: 'Health Camps', icon: '🏕️' },
-  { id: 'audit', label: 'Audit Log', icon: '📋' },
+const TABS: { id: CentreTab; icon: string }[] = [
+  { id: 'overview', icon: '📊' },
+  { id: 'infrastructure', icon: '🏥' },
+  { id: 'stock', icon: '💊' },
+  { id: 'camps', icon: '🏕️' },
+  { id: 'audit', icon: '📋' },
 ];
 
 /**
@@ -22,6 +23,8 @@ const TABS: { id: CentreTab; label: string; icon: string }[] = [
  * Scrollable on mobile, pill-style on desktop.
  */
 export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
+  const t = useTranslations('tabs');
+
   return (
     <nav
       className="flex gap-1 overflow-x-auto pb-1 mb-6 border-b border-gray-200 scrollbar-hide"
@@ -46,7 +49,7 @@ export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
             `}
           >
             <span className="text-base" aria-hidden="true">{tab.icon}</span>
-            {tab.label}
+            {t(tab.id)}
           </button>
         );
       })}

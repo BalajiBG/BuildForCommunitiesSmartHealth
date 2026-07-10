@@ -81,5 +81,32 @@
     "metricAttendanceBelow50": "उपस्थिति < 50%",
     "metricBedsAtZero": "बिस्तर शून्य पर",
     "metricFootfallExceedsCapacity": "फुटफॉल क्षमता से अधिक"
+  },
+  "tabs": {
+    "overview": "अवलोकन",
+    "infrastructure": "अवसंरचना",
+    "stock": "दवा स्टॉक",
+    "camps": "स्वास्थ्य शिविर",
+    "audit": "ऑडिट लॉग"
+  },
+  "directives": {
+    "activeDirectives": "सक्रिय निर्देश",
+    "completedDirectives": "पूर्ण निर्देश",
+    "acknowledge": "स्वीकार करें",
+    "inProgress": "प्रगति में",
+    "markComplete": "पूर्ण करें",
+    "addRemarks": "टिप्पणी जोड़ें",
+    "issued": "जारी",
+    "normal": "सामान्य",
+    "high": "उच्च",
+    "critical": "गंभीर"
+  },
+  "actions": {
+    "acknowledge": "स्वीकार करें",
+    "inProgress": "प्रगति में",
+    "markComplete": "पूर्ण चिह्नित करें",
+    "addRemarks": "टिप्पणी जोड़ें",
+    "issueDirective": "निर्देश जारी करें",
+    "raiseIndent": "इंडेंट उठाएं"
   }
 }

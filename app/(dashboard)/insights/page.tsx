@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/contexts/AuthProvider';
+import { t as tr } from '@/lib/i18n/translations';
 import { StockPrediction, RedistributionRecommendation } from '@/lib/types';
 
 interface PredictionsResponse {
@@ -40,14 +41,14 @@ function daysUntil(dateStr: string): number {
 /**
  * Get urgency level based on days remaining.
  */
-function getUrgency(days: number): { label: string; badge: string; color: string; bgColor: string; borderColor: string } {
+function getUrgency(days: number): { label: string; labelHi: string; badge: string; color: string; bgColor: string; borderColor: string } {
   if (days < 7) {
-    return { label: 'Critical', badge: '🔴', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-200' };
+    return { label: 'Critical', labelHi: 'गंभीर', badge: '🔴', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-200' };
   }
   if (days <= 14) {
-    return { label: 'Warning', badge: '🟠', color: 'text-orange-700', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' };
+    return { label: 'Warning', labelHi: 'चेतावनी', badge: '🟠', color: 'text-orange-700', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' };
   }
-  return { label: 'Caution', badge: '🟡', color: 'text-yellow-700', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' };
+  return { label: 'Caution', labelHi: 'सावधानी', badge: '🟡', color: 'text-yellow-700', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' };
 }
 
 /**
@@ -155,9 +156,11 @@ export default function AIInsightsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('insights')}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {profile?.role === 'Centre_Staff'
-              ? 'AI-powered analytics and recommendations for your centre'
-              : 'AI-powered analytics and recommendations for your district'}
+            {language === 'hi'
+              ? 'AI-संचालित विश्लेषण और अनुशंसाएं'
+              : (profile?.role === 'Centre_Staff'
+                ? 'AI-powered analytics and recommendations for your centre'
+                : 'AI-powered analytics and recommendations for your district')}
           </p>
         </div>
         <button
@@ -167,7 +170,7 @@ export default function AIInsightsPage() {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
           </svg>
-          Refresh All
+          {language === 'hi' ? 'सभी रिफ्रेश करें' : 'Refresh All'}
         </button>
       </div>
 
@@ -177,8 +180,9 @@ export default function AIInsightsPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
         </svg>
         <p>
-          <strong>AI-Generated Insights:</strong> Predictions are based on historical consumption patterns and may not account for unexpected events.
-          Always verify critical decisions with on-ground data. All actions are audit-logged for accountability.
+          {language === 'hi'
+            ? <><strong>AI-जनित अंतर्दृष्टि:</strong> पूर्वानुमान ऐतिहासिक उपभोग पैटर्न पर आधारित हैं। महत्वपूर्ण निर्णयों को ज़मीनी डेटा से सत्यापित करें। सभी कार्रवाइयां ऑडिट-लॉग की जाती हैं।</>
+            : <><strong>AI-Generated Insights:</strong> Predictions are based on historical consumption patterns and may not account for unexpected events. Always verify critical decisions with on-ground data. All actions are audit-logged for accountability.</>}
         </p>
       </div>
 
@@ -186,33 +190,33 @@ export default function AIInsightsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard
           icon="🚨"
-          label="Critical Alerts"
+          label={tr('critical_alerts', language)}
           value={criticalAlerts}
-          subtitle="Medicines in emergency zone"
+          subtitle={language === 'hi' ? 'आपातकालीन क्षेत्र में दवाएं' : 'Medicines in emergency zone'}
           loading={predictionsLoading}
           color="red"
         />
         <SummaryCard
           icon="📈"
-          label="Stock-Out Risk"
+          label={tr('stock_out_risk', language)}
           value={stockOutRisk}
-          subtitle="Running out in ≤7 days"
+          subtitle={language === 'hi' ? '≤7 दिनों में खत्म हो रही' : 'Running out in ≤7 days'}
           loading={predictionsLoading}
           color="orange"
         />
         <SummaryCard
           icon="🔄"
-          label="Pending Redistributions"
+          label={tr('pending_redistributions', language)}
           value={pendingRedistributions}
-          subtitle="Recommended transfers"
+          subtitle={language === 'hi' ? 'अनुशंसित स्थानांतरण' : 'Recommended transfers'}
           loading={recommendationsLoading}
           color="blue"
         />
         <SummaryCard
           icon="🏥"
-          label="Underperforming Centres"
+          label={tr('underperforming_centres', language)}
           value={underperformingCentres}
-          subtitle="Flagged centres"
+          subtitle={language === 'hi' ? 'चिह्नित केंद्र' : 'Flagged centres'}
           loading={evaluationsLoading}
           color="purple"
         />
@@ -221,9 +225,9 @@ export default function AIInsightsPage() {
       {/* Section B: Stock-Out Predictions */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Stock-Out Predictions</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{tr('stock_out_predictions', language)}</h2>
           {!predictionsLoading && (
-            <span className="text-xs text-gray-500">{predictions.length} items tracked</span>
+            <span className="text-xs text-gray-500">{predictions.length} {language === 'hi' ? 'आइटम ट्रैक किए गए' : 'items tracked'}</span>
           )}
         </div>
 
@@ -234,7 +238,7 @@ export default function AIInsightsPage() {
         )}
 
         {!predictionsLoading && !predictionsError && predictions.length === 0 && (
-          <EmptyState message="No stock-out risks detected. All medicines are at safe levels." />
+          <EmptyState message={language === 'hi' ? 'कोई स्टॉक-आउट जोखिम नहीं। सभी दवाएं सुरक्षित स्तर पर हैं।' : 'No stock-out risks detected. All medicines are at safe levels.'} />
         )}
 
         {!predictionsLoading && !predictionsError && predictions.length > 0 && (
@@ -249,18 +253,18 @@ export default function AIInsightsPage() {
                 >
                   <div className="flex items-start justify-between mb-2">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${urgency.color} bg-white/80`}>
-                      {urgency.badge} {urgency.label}
+                      {urgency.badge} {language === 'hi' ? urgency.labelHi : urgency.label}
                     </span>
                     <span className={`text-sm font-bold ${urgency.color}`}>
-                      {days}d left
+                      {days}{language === 'hi' ? ' दिन शेष' : 'd left'}
                     </span>
                   </div>
                   <h3 className="font-medium text-gray-900 text-sm">{prediction.centreName}</h3>
                   <p className="text-sm text-gray-600 mt-0.5">{prediction.medicineName}</p>
                   <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200/50">
-                    <span className="text-xs text-gray-500">Current: {prediction.currentQuantity} units</span>
+                    <span className="text-xs text-gray-500">{language === 'hi' ? 'वर्तमान:' : 'Current:'} {prediction.currentQuantity} {language === 'hi' ? 'यूनिट' : 'units'}</span>
                     <span className="text-xs text-gray-500">
-                      Stock-out: {new Date(prediction.predictedStockOutDate).toLocaleDateString()}
+                      {language === 'hi' ? 'स्टॉक-आउट:' : 'Stock-out:'} {new Date(prediction.predictedStockOutDate).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
@@ -273,9 +277,9 @@ export default function AIInsightsPage() {
       {/* Section C: Redistribution Recommendations */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Redistribution Recommendations</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{tr('redistribution', language)}</h2>
           {!recommendationsLoading && (
-            <span className="text-xs text-gray-500">{recommendations.length} transfers suggested</span>
+            <span className="text-xs text-gray-500">{recommendations.length} {language === 'hi' ? 'स्थानांतरण सुझाए गए' : 'transfers suggested'}</span>
           )}
         </div>
 
@@ -303,14 +307,14 @@ export default function AIInsightsPage() {
                     <span className="text-sm font-medium text-gray-700">{rec.resourceName}</span>
                   )}
                   <span className="ml-auto text-sm font-bold text-indigo-600">
-                    Qty: {rec.quantity}
+                    {language === 'hi' ? 'मात्रा:' : 'Qty:'} {rec.quantity}
                   </span>
                 </div>
 
                 {/* Transfer visual */}
                 <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
                   <div className="flex-1 text-center">
-                    <p className="text-xs text-gray-500 mb-0.5">From</p>
+                    <p className="text-xs text-gray-500 mb-0.5">{language === 'hi' ? 'से' : 'From'}</p>
                     <p className="text-sm font-semibold text-gray-900">{rec.sourceCentreName}</p>
                   </div>
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-100">
@@ -319,7 +323,7 @@ export default function AIInsightsPage() {
                     </svg>
                   </div>
                   <div className="flex-1 text-center">
-                    <p className="text-xs text-gray-500 mb-0.5">To</p>
+                    <p className="text-xs text-gray-500 mb-0.5">{language === 'hi' ? 'को' : 'To'}</p>
                     <p className="text-sm font-semibold text-gray-900">{rec.destinationCentreName}</p>
                   </div>
                 </div>
@@ -384,10 +388,12 @@ function SummaryCard({
 }
 
 function ResourceBadge({ type }: { type: 'medicine' | 'staff' | 'beds' }) {
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const config = {
-    medicine: { label: 'Medicine', bg: 'bg-green-100', text: 'text-green-700', icon: '💊' },
-    staff: { label: 'Staff', bg: 'bg-blue-100', text: 'text-blue-700', icon: '👨‍⚕️' },
-    beds: { label: 'Beds', bg: 'bg-purple-100', text: 'text-purple-700', icon: '🛏️' },
+    medicine: { label: lang === 'hi' ? 'दवा' : 'Medicine', bg: 'bg-green-100', text: 'text-green-700', icon: '💊' },
+    staff: { label: lang === 'hi' ? 'स्टाफ' : 'Staff', bg: 'bg-blue-100', text: 'text-blue-700', icon: '👨‍⚕️' },
+    beds: { label: lang === 'hi' ? 'बिस्तर' : 'Beds', bg: 'bg-purple-100', text: 'text-purple-700', icon: '🛏️' },
   };
   const c = config[type] || config.medicine;
   return (

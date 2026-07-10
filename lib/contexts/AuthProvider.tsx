@@ -114,7 +114,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Persists to sessionStorage so it survives page navigations.
    */
   const signInDemo = useCallback((role: 'District_Admin' | 'Centre_Staff') => {
-    const demoProfile = DEMO_PROFILES[role];
+    // Get current locale from localStorage (set by LanguageSwitcher)
+    const currentLocale = (typeof window !== 'undefined' ? localStorage.getItem('locale') : null) || 'en';
+    const demoProfile = { ...DEMO_PROFILES[role], languagePreference: currentLocale as 'en' | 'hi' };
     setProfile(demoProfile);
     setUser({ uid: demoProfile.uid, email: demoProfile.email } as unknown as User);
     setIsDemo(true);

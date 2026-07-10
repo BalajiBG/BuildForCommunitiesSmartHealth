@@ -5,6 +5,7 @@ import { ref, get } from 'firebase/database';
 import { database } from '@/lib/firebase/client';
 import { useAuth } from '@/lib/contexts/AuthProvider';
 import { dbPaths } from '@/lib/firebase/types';
+import { t } from '@/lib/i18n/translations';
 
 interface DistrictAdminContact {
   name: string;
@@ -41,9 +42,22 @@ interface CentreWithContact {
 
 export default function ContactsPage() {
   const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [contactsData, setContactsData] = useState<ContactsData | null>(null);
   const [centres, setCentres] = useState<CentreWithContact[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const translateDesignation = (text: string): string => {
+    if (lang === 'en') return text;
+    const map: Record<string, string> = {
+      'Chief Medical Officer': 'मुख्य चिकित्सा अधिकारी',
+      'Medical Officer': 'चिकित्सा अधिकारी',
+      'Chief District Health Officer': 'मुख्य जिला स्वास्थ्य अधिकारी',
+      'District Health Office, Anand': 'जिला स्वास्थ्य कार्यालय, आनंद',
+      'District Health Office': 'जिला स्वास्थ्य कार्यालय',
+    };
+    return map[text] || text;
+  };
 
   useEffect(() => {
     if (!profile?.districtId) return;
@@ -95,23 +109,23 @@ export default function ContactsPage() {
     <div className="p-4 lg:p-6 max-w-5xl mx-auto space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Contact Directory</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('contact_directory', lang)}</h1>
         <p className="text-sm text-gray-500 mt-1">
           {isDistrictAdmin
-            ? 'All centre contacts and emergency numbers'
-            : 'District admin, nearby centres, and emergency contacts'}
+            ? t('contacts_desc_admin', lang)
+            : t('contacts_desc_staff', lang)}
         </p>
       </div>
 
       {/* Emergency Contacts — prominent for both roles */}
       {contactsData?.emergency && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Emergency Numbers</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">{t('emergency_numbers', lang)}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <EmergencyCard label="Ambulance" number={contactsData.emergency.ambulance} color="red" />
-            <EmergencyCard label="Blood Bank" number={contactsData.emergency.bloodBank} color="red" />
-            <EmergencyCard label="District Hospital" number={contactsData.emergency.districtHospital} color="orange" />
-            <EmergencyCard label="Poison Control" number={contactsData.emergency.poisonControl} color="orange" />
+            <EmergencyCard label={t('ambulance', lang)} number={contactsData.emergency.ambulance} color="red" />
+            <EmergencyCard label={t('blood_bank', lang)} number={contactsData.emergency.bloodBank} color="red" />
+            <EmergencyCard label={t('district_hospital', lang)} number={contactsData.emergency.districtHospital} color="orange" />
+            <EmergencyCard label={t('poison_control', lang)} number={contactsData.emergency.poisonControl} color="orange" />
           </div>
         </section>
       )}
@@ -119,7 +133,7 @@ export default function ContactsPage() {
       {/* District Admin contact — for Centre Staff */}
       {!isDistrictAdmin && contactsData?.districtAdmin && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">District Admin</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">{t('district_admin', lang)}</h2>
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="flex-shrink-0 w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
@@ -129,8 +143,8 @@ export default function ContactsPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-base font-semibold text-gray-900">{contactsData.districtAdmin.name}</p>
-                <p className="text-sm text-gray-500">{contactsData.districtAdmin.designation}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{contactsData.districtAdmin.office}</p>
+                <p className="text-sm text-gray-500">{translateDesignation(contactsData.districtAdmin.designation)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{translateDesignation(contactsData.districtAdmin.office)}</p>
               </div>
               <div className="flex flex-col gap-2 sm:items-end">
                 <a
@@ -157,7 +171,7 @@ export default function ContactsPage() {
       {centres.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold text-gray-800 mb-3">
-            {isDistrictAdmin ? 'All Centre Contacts' : 'Other Centres (for Referrals)'}
+            {isDistrictAdmin ? t('all_centre_contacts', lang) : t('other_centres_referrals', lang)}
           </h2>
 
           {/* Desktop table */}
@@ -165,11 +179,11 @@ export default function ContactsPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Centre</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Head / MO</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Phone</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">{t('centre', lang)}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">{t('head_mo', lang)}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">{t('phone', lang)}</th>
                   {isDistrictAdmin && (
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">{t('email', lang)}</th>
                   )}
                 </tr>
               </thead>
@@ -181,7 +195,7 @@ export default function ContactsPage() {
                       <td className="px-4 py-3 font-medium text-gray-900">{centre.name}</td>
                       <td className="px-4 py-3 text-gray-600">
                         <div>{centre.contact.headName}</div>
-                        <div className="text-xs text-gray-400">{centre.contact.designation}</div>
+                        <div className="text-xs text-gray-400">{translateDesignation(centre.contact.designation)}</div>
                       </td>
                       <td className="px-4 py-3">
                         <a
@@ -215,7 +229,7 @@ export default function ContactsPage() {
                 <div key={centre.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                   <p className="font-semibold text-gray-900">{centre.name}</p>
                   <p className="text-sm text-gray-500">
-                    {centre.contact.headName} — {centre.contact.designation}
+                    {centre.contact.headName} — {translateDesignation(centre.contact.designation)}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <a
@@ -223,7 +237,7 @@ export default function ContactsPage() {
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
                     >
                       <PhoneIcon />
-                      Call
+                      {t('call', lang)}
                     </a>
                     {isDistrictAdmin && (
                       <a
@@ -231,7 +245,7 @@ export default function ContactsPage() {
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                       >
                         <EmailIcon />
-                        Email
+                        {t('email', lang)}
                       </a>
                     )}
                   </div>

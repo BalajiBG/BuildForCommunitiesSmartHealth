@@ -6,6 +6,7 @@ import { database } from '@/lib/firebase/client';
 import { dbPaths } from '@/lib/firebase/types';
 import { useAuth } from '@/lib/contexts/AuthProvider';
 import { useAuditLog } from '@/lib/hooks/useAuditLog';
+import { t } from '@/lib/i18n/translations';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ const STATUS_BADGES: Record<CampStatus, { emoji: string; label: string; classNam
 
 export default function HealthCampsPanel({ centreId, readOnly = false }: HealthCampsPanelProps) {
   const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const { log } = useAuditLog(centreId);
 
   const [camps, setCamps] = useState<HealthCamp[]>([]);
@@ -186,13 +188,13 @@ export default function HealthCampsPanel({ centreId, readOnly = false }: HealthC
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h2 className="text-lg font-semibold text-gray-900">Health Camps</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{t('health_camps', lang)}</h2>
         {!readOnly && (
           <button
             onClick={() => { setShowForm(true); setEditingCamp(null); }}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
-            <span aria-hidden="true">+</span> Schedule New Camp
+            <span aria-hidden="true">+</span> {t('schedule_new_camp', lang)}
           </button>
         )}
       </div>
@@ -205,7 +207,7 @@ export default function HealthCampsPanel({ centreId, readOnly = false }: HealthC
             view === 'upcoming' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Upcoming & Active ({upcomingCamps.length})
+          {t('upcoming_and_active', lang)} ({upcomingCamps.length})
         </button>
         <button
           onClick={() => setView('past')}
@@ -213,7 +215,7 @@ export default function HealthCampsPanel({ centreId, readOnly = false }: HealthC
             view === 'past' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Past ({pastCamps.length})
+          {t('past', lang)} ({pastCamps.length})
         </button>
       </div>
 
@@ -237,7 +239,7 @@ export default function HealthCampsPanel({ centreId, readOnly = false }: HealthC
       {/* Camp cards */}
       {displayedCamps.length === 0 ? (
         <div className="text-center py-10 text-gray-500">
-          {view === 'upcoming' ? 'No upcoming or active camps scheduled.' : 'No past camps recorded.'}
+          {view === 'upcoming' ? t('no_upcoming_camps', lang) : t('no_past_camps', lang)}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -349,6 +351,8 @@ function CampForm({
   onSubmit: (data: Omit<HealthCamp, 'id' | 'createdBy' | 'createdAt'>) => Promise<void>;
   onCancel: () => void;
 }) {
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [name, setName] = useState('');
   const [type, setType] = useState<CampType>('screening');
   const [date, setDate] = useState('');
@@ -380,10 +384,10 @@ function CampForm({
 
   return (
     <div className="bg-white border border-blue-200 rounded-xl p-5 shadow-sm">
-      <h3 className="font-semibold text-gray-900 mb-4">Schedule New Camp</h3>
+      <h3 className="font-semibold text-gray-900 mb-4">{t('schedule_new_camp', lang)}</h3>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
-          <label htmlFor="camp-name" className="block text-sm font-medium text-gray-700 mb-1">Camp Name *</label>
+          <label htmlFor="camp-name" className="block text-sm font-medium text-gray-700 mb-1">{t('camp_name', lang)} *</label>
           <input
             id="camp-name"
             type="text"
@@ -396,7 +400,7 @@ function CampForm({
         </div>
 
         <div>
-          <label htmlFor="camp-type" className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+          <label htmlFor="camp-type" className="block text-sm font-medium text-gray-700 mb-1">{t('type', lang)} *</label>
           <select
             id="camp-type"
             value={type}
@@ -410,7 +414,7 @@ function CampForm({
         </div>
 
         <div>
-          <label htmlFor="camp-date" className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+          <label htmlFor="camp-date" className="block text-sm font-medium text-gray-700 mb-1">{t('date', lang)} *</label>
           <input
             id="camp-date"
             type="date"
@@ -422,7 +426,7 @@ function CampForm({
         </div>
 
         <div>
-          <label htmlFor="camp-target" className="block text-sm font-medium text-gray-700 mb-1">Target Beneficiaries *</label>
+          <label htmlFor="camp-target" className="block text-sm font-medium text-gray-700 mb-1">{t('target_beneficiaries', lang)} *</label>
           <input
             id="camp-target"
             type="number"
@@ -436,7 +440,7 @@ function CampForm({
         </div>
 
         <div>
-          <label htmlFor="camp-organizer" className="block text-sm font-medium text-gray-700 mb-1">Organizer *</label>
+          <label htmlFor="camp-organizer" className="block text-sm font-medium text-gray-700 mb-1">{t('organizer', lang)} *</label>
           <input
             id="camp-organizer"
             type="text"
@@ -449,7 +453,7 @@ function CampForm({
         </div>
 
         <div className="md:col-span-2">
-          <label htmlFor="camp-location" className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
+          <label htmlFor="camp-location" className="block text-sm font-medium text-gray-700 mb-1">{t('location', lang)} *</label>
           <input
             id="camp-location"
             type="text"
@@ -462,7 +466,7 @@ function CampForm({
         </div>
 
         <div className="md:col-span-2">
-          <label htmlFor="camp-notes" className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+          <label htmlFor="camp-notes" className="block text-sm font-medium text-gray-700 mb-1">{t('notes', lang)}</label>
           <textarea
             id="camp-notes"
             value={notes}
@@ -479,14 +483,14 @@ function CampForm({
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            Cancel
+            {t('cancel', lang)}
           </button>
           <button
             type="submit"
             disabled={submitting}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {submitting ? 'Scheduling...' : 'Schedule Camp'}
+            {submitting ? t('scheduling', lang) : t('schedule_camp_btn', lang)}
           </button>
         </div>
       </form>
@@ -506,6 +510,8 @@ function CampEditForm({
   onSubmit: (updates: Partial<HealthCamp>) => Promise<void>;
   onCancel: () => void;
 }) {
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [status, setStatus] = useState<CampStatus>(camp.status);
   const [actualBeneficiaries, setActualBeneficiaries] = useState(
     camp.actualBeneficiaries?.toString() ?? ''
@@ -529,11 +535,11 @@ function CampEditForm({
 
   return (
     <div className="bg-white border border-yellow-200 rounded-xl p-5 shadow-sm">
-      <h3 className="font-semibold text-gray-900 mb-1">Update Camp</h3>
+      <h3 className="font-semibold text-gray-900 mb-1">{t('update_camp', lang)}</h3>
       <p className="text-sm text-gray-500 mb-4">{camp.name}</p>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="edit-status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <label htmlFor="edit-status" className="block text-sm font-medium text-gray-700 mb-1">{t('status', lang)}</label>
           <select
             id="edit-status"
             value={status}
@@ -549,7 +555,7 @@ function CampEditForm({
 
         <div>
           <label htmlFor="edit-actual" className="block text-sm font-medium text-gray-700 mb-1">
-            Actual Beneficiaries
+            {t('actual_beneficiaries', lang)}
           </label>
           <input
             id="edit-actual"
@@ -563,7 +569,7 @@ function CampEditForm({
         </div>
 
         <div className="md:col-span-2">
-          <label htmlFor="edit-notes" className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+          <label htmlFor="edit-notes" className="block text-sm font-medium text-gray-700 mb-1">{t('notes', lang)}</label>
           <textarea
             id="edit-notes"
             value={notes}
@@ -579,14 +585,14 @@ function CampEditForm({
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            Cancel
+            {t('cancel', lang)}
           </button>
           <button
             type="submit"
             disabled={submitting}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {submitting ? 'Updating...' : 'Update Camp'}
+            {submitting ? t('updating', lang) : t('update_camp', lang)}
           </button>
         </div>
       </form>

@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { database } from '@/lib/firebase/client';
 import { dbPaths } from '@/lib/firebase/types';
+import { t } from '@/lib/i18n/translations';
+import { useAuth } from '@/lib/contexts/AuthProvider';
 import type { PatientVisit, Department, AgeGroup, Gender, VisitType } from '@/lib/types';
 
 interface PatientInsightsProps {
@@ -17,6 +19,21 @@ const ALL_DEPARTMENTS: Department[] = [
 const ALL_AGE_GROUPS: AgeGroup[] = ['0-5 years', '6-14 years', '15-30 years', '31-50 years', '51-65 years', '65+ years'];
 const ALL_GENDERS: Gender[] = ['Male', 'Female', 'Other'];
 const ALL_VISIT_TYPES: VisitType[] = ['New OPD', 'Follow-up OPD', 'Emergency', 'Lab/Investigation only'];
+
+// Translation key maps for display labels
+const DEPT_TRANSLATION_KEY: Record<string, string> = {
+  'General Medicine': 'dept_general_medicine', 'Dental': 'dept_dental', 'Ophthalmology': 'dept_ophthalmology',
+  'Dermatology': 'dept_dermatology', 'Paediatrics': 'dept_paediatrics', 'Gynaecology/ANC': 'dept_gynaecology',
+  'Preventive Health Check': 'dept_preventive', 'Emergency': 'dept_emergency',
+};
+const AGE_TRANSLATION_KEY: Record<string, string> = {
+  '0-5 years': 'age_0_5', '6-14 years': 'age_6_14', '15-30 years': 'age_15_30',
+  '31-50 years': 'age_31_50', '51-65 years': 'age_51_65', '65+ years': 'age_65_plus',
+};
+const GENDER_TRANSLATION_KEY: Record<string, string> = { 'Male': 'gender_male', 'Female': 'gender_female', 'Other': 'gender_other' };
+const VISIT_TRANSLATION_KEY: Record<string, string> = {
+  'New OPD': 'visit_new_opd', 'Follow-up OPD': 'visit_followup', 'Emergency': 'visit_emergency', 'Lab/Investigation only': 'visit_lab',
+};
 
 const DEPT_COLORS: Record<string, string> = {
   'General Medicine': 'bg-blue-500',
@@ -48,20 +65,33 @@ interface Filters {
  * Multiple filters can be combined. Click again to deselect.
  */
 export default function PatientInsights({ centreId }: PatientInsightsProps) {
-  const today = new Date().toISOString().split('T')[0];
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [allVisits, setAllVisits] = useState<PatientVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<Filters>({ department: null, ageGroup: null, gender: null, visitType: null });
 
   useEffect(() => {
-    const visitsRef = ref(database, dbPaths.visits(centreId, today));
+    // Fetch ALL visits (all dates) for richer insights display
+    const visitsRef = ref(database, `visits/${centreId}`);
     const unsubscribe = onValue(visitsRef, (snapshot) => {
-      const raw = snapshot.val() as Record<string, PatientVisit> | null;
-      setAllVisits(raw ? Object.values(raw) : []);
+      const raw = snapshot.val() as Record<string, Record<string, PatientVisit>> | null;
+      if (raw) {
+        // Flatten: { date: { visitId: visit } } → PatientVisit[]
+        const visits: PatientVisit[] = [];
+        for (const dateVisits of Object.values(raw)) {
+          for (const visit of Object.values(dateVisits)) {
+            visits.push(visit);
+          }
+        }
+        setAllVisits(visits);
+      } else {
+        setAllVisits([]);
+      }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [centreId, today]);
+  }, [centreId]);
 
   const toggleFilter = useCallback((key: keyof Filters, value: string) => {
     setFilters(prev => ({
@@ -114,8 +144,8 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
   if (allVisits.length === 0) {
     return (
       <div className="p-5 border rounded-xl bg-white shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">Patient Insights — Today</h3>
-        <p className="text-sm text-gray-500">No detailed visit data recorded for today yet.</p>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">{t('patient_insights', lang)}</h3>
+        <p className="text-sm text-gray-500">{t('no_visit_data', lang)}</p>
       </div>
     );
   }
@@ -132,7 +162,7 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h3 className="text-lg font-semibold text-gray-800">Patient Insights — Today</h3>
+          <h3 className="text-lg font-semibold text-gray-800">{t('patient_insights_all_time', lang)}</h3>
           {hasAnyFilter && (
             <p className="text-xs text-indigo-600 mt-0.5">
               {filteredVisits.length} of {allVisits.length} visits
@@ -141,15 +171,15 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
           )}
         </div>
         <span className="text-sm font-bold text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md">
-          {hasAnyFilter ? `${filteredVisits.length} / ${allVisits.length}` : `${allVisits.length}`} visits
+          {hasAnyFilter ? `${filteredVisits.length} / ${allVisits.length}` : `${allVisits.length}`} {t('visits', lang)}
         </span>
       </div>
 
       {/* Department Breakdown — clickable */}
       <section>
         <h4 className="text-sm font-medium text-gray-600 mb-2">
-          Department
-          <span className="text-xs text-gray-400 ml-1">(click to filter)</span>
+          {t('department', lang)}
+          <span className="text-xs text-gray-400 ml-1">({t('click_to_filter', lang)})</span>
         </h4>
         <div className="space-y-1">
           {ALL_DEPARTMENTS.map((dept) => {
@@ -170,7 +200,7 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
                 }`}
                 aria-pressed={isSelected}
               >
-                <span className={`text-xs w-36 truncate ${isSelected ? 'font-bold text-indigo-800' : count === 0 ? 'text-gray-400' : 'text-gray-600'}`}>{dept}</span>
+                <span className={`text-xs w-36 truncate ${isSelected ? 'font-bold text-indigo-800' : count === 0 ? 'text-gray-400' : 'text-gray-600'}`}>{t(DEPT_TRANSLATION_KEY[dept] || dept, lang)}</span>
                 <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${DEPT_COLORS[dept] || 'bg-gray-400'} ${count === 0 ? 'opacity-20' : isSelected ? 'opacity-100' : 'opacity-70'}`}
@@ -187,8 +217,8 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
       {/* Age Distribution — clickable */}
       <section>
         <h4 className="text-sm font-medium text-gray-600 mb-2">
-          Age Group
-          <span className="text-xs text-gray-400 ml-1">(click to filter)</span>
+          {t('age_group', lang)}
+          <span className="text-xs text-gray-400 ml-1">({t('click_to_filter', lang)})</span>
         </h4>
         <div className="flex items-end gap-1 h-28">
           {ALL_AGE_GROUPS.map((group) => {
@@ -215,7 +245,7 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
                   />
                 </div>
                 <span className={`text-[10px] text-center leading-tight ${isSelected ? 'font-bold text-indigo-700' : 'text-gray-500'}`}>
-                  {group.replace(' years', '')}
+                  {t(AGE_TRANSLATION_KEY[group] || group, lang)}
                 </span>
               </button>
             );
@@ -226,8 +256,8 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
       {/* Gender Split — clickable */}
       <section>
         <h4 className="text-sm font-medium text-gray-600 mb-2">
-          Gender
-          <span className="text-xs text-gray-400 ml-1">(click to filter)</span>
+          {t('gender', lang)}
+          <span className="text-xs text-gray-400 ml-1">({t('click_to_filter', lang)})</span>
         </h4>
         <div className="flex gap-2">
           {ALL_GENDERS.map((g) => {
@@ -249,7 +279,7 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
               >
                 <div className={`w-4 h-4 rounded-full ${GENDER_COLORS[g]}`} />
                 <span className={`text-lg font-bold ${isSelected ? 'text-indigo-700' : 'text-gray-900'}`}>{count}</span>
-                <span className="text-xs text-gray-500">{g}</span>
+                <span className="text-xs text-gray-500">{t(GENDER_TRANSLATION_KEY[g] || g, lang)}</span>
                 <span className="text-xs text-gray-400">{pct}%</span>
               </button>
             );
@@ -260,8 +290,8 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
       {/* Visit Type — clickable */}
       <section>
         <h4 className="text-sm font-medium text-gray-600 mb-2">
-          Visit Type
-          <span className="text-xs text-gray-400 ml-1">(click to filter)</span>
+          {t('visit_type', lang)}
+          <span className="text-xs text-gray-400 ml-1">({t('click_to_filter', lang)})</span>
         </h4>
         <div className="flex flex-wrap gap-2">
           {ALL_VISIT_TYPES.map((type) => {
@@ -282,7 +312,7 @@ export default function PatientInsights({ centreId }: PatientInsightsProps) {
                 }`}
                 aria-pressed={isSelected}
               >
-                {type}
+                {t(VISIT_TRANSLATION_KEY[type] || type, lang)}
                 <span className={`font-bold ${isSelected ? 'text-indigo-700' : count === 0 ? 'text-gray-300' : 'text-gray-500'}`}>{count}</span>
               </button>
             );

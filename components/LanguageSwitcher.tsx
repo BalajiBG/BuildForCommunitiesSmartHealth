@@ -1,16 +1,13 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
 import { locales, localeNames, type Locale } from '@/lib/i18n/config';
 import { useLocaleSwitch } from '@/lib/i18n/provider';
 
 /**
  * Dropdown component for switching between English and Hindi.
- * Uses next-intl hooks for translated labels and persists the
- * selection to localStorage (synced to user profile when authenticated).
+ * Shows each language in its native script (English, हिंदी).
  */
 export function LanguageSwitcher() {
-  const t = useTranslations('language');
   const { locale, changeLocale } = useLocaleSwitch();
 
   return (
@@ -22,7 +19,7 @@ export function LanguageSwitcher() {
     >
       {locales.map((loc) => (
         <option key={loc} value={loc}>
-          {t(loc)}
+          {localeNames[loc]}
         </option>
       ))}
     </select>

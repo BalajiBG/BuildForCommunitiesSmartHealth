@@ -9,6 +9,8 @@ import { getStockColour } from '@/lib/services/stock-analysis';
 import { MedicineStock } from '@/lib/types';
 import { StockEditForm } from './StockEditForm';
 import { useAuditLog } from '@/lib/hooks/useAuditLog';
+import { t as tStatic } from '@/lib/i18n/translations';
+import { useAuth } from '@/lib/contexts/AuthProvider';
 
 interface StockTableProps {
   centreId: string;
@@ -99,6 +101,8 @@ const ACTION_BUTTON_STYLES = {
 export function StockTable({ centreId, readOnly = false }: StockTableProps) {
   const t = useTranslations('stock');
   const tCommon = useTranslations('common');
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [medicines, setMedicines] = useState<MedicineStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState<{ id: string; text: string; type: 'success' | 'info' } | null>(null);
@@ -190,7 +194,7 @@ export function StockTable({ centreId, readOnly = false }: StockTableProps) {
   }
 
   if (medicines.length === 0) {
-    return <p className="text-gray-500">No medicines found for this centre.</p>;
+    return <p className="text-gray-500">{tStatic('no_medicines_found', lang)}</p>;
   }
 
   return (
@@ -207,25 +211,25 @@ export function StockTable({ centreId, readOnly = false }: StockTableProps) {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                {t('medicineName')}
+                {tStatic('medicine_name', lang)}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Current Stock
+                {tStatic('current_stock_label', lang)}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Min. Required
+                {tStatic('min_required', lang)}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                {t('expiry')}
+                {tStatic('expiry_date', lang)}
               </th>
               {!readOnly && (
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Status & Action
+                  {tStatic('status_and_action', lang)}
                 </th>
               )}
               {readOnly && (
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Status
+                  {tStatic('status', lang)}
                 </th>
               )}
             </tr>

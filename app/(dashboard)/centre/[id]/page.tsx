@@ -7,6 +7,7 @@ import { ref, onValue } from 'firebase/database';
 import { database } from '@/lib/firebase/client';
 import { dbPaths } from '@/lib/firebase/types';
 import { useAuth } from '@/lib/contexts/AuthProvider';
+import { t } from '@/lib/i18n/translations';
 import { StockTable } from './components/StockTable';
 import FootfallChart from './components/FootfallChart';
 import FootfallInputForm from './components/FootfallInputForm';
@@ -48,6 +49,7 @@ function CentreDetailContent() {
   const isOwnCentre = profile?.role === 'Centre_Staff' && profile.centreId === centreId;
   const isAdmin = profile?.role === 'District_Admin';
   const isStaff = isOwnCentre; // Only allow editing if it's their own centre
+  const lang = profile?.languagePreference ?? 'en';
 
   const [centreInfo, setCentreInfo] = useState<CentreInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,11 +102,11 @@ function CentreDetailContent() {
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Dashboard
+            {t('back_to_dashboard', lang)}
           </Link>
         )}
         <h1 className="text-2xl font-bold text-gray-900">
-          {centreInfo?.name ?? 'Centre Details'}
+          {centreInfo?.name ?? t('centre_details', lang)}
         </h1>
       </div>
 

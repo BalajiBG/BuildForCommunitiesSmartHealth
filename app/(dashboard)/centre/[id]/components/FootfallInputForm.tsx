@@ -5,6 +5,8 @@ import { ref, push, onValue, runTransaction } from 'firebase/database';
 import { database } from '@/lib/firebase/client';
 import { dbPaths } from '@/lib/firebase/types';
 import { useAuditLog } from '@/lib/hooks/useAuditLog';
+import { t } from '@/lib/i18n/translations';
+import { useAuth } from '@/lib/contexts/AuthProvider';
 import type { Department, AgeGroup, Gender, VisitType, PatientVisit } from '@/lib/types';
 
 interface FootfallInputFormProps {
@@ -49,6 +51,8 @@ const VISIT_TYPES: VisitType[] = [
 export default function FootfallInputForm({ centreId }: FootfallInputFormProps) {
   const today = new Date().toISOString().split('T')[0];
   const { log: auditLog } = useAuditLog(centreId);
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
 
   const [department, setDepartment] = useState<Department>('General Medicine');
   const [ageGroup, setAgeGroup] = useState<AgeGroup>('31-50 years');
@@ -121,9 +125,9 @@ export default function FootfallInputForm({ centreId }: FootfallInputFormProps) 
     <div className="p-4 border rounded-lg bg-white shadow-sm">
       {/* Header with today's count */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Record Patient Visit</h3>
+        <h3 className="text-lg font-semibold text-gray-800">{t('record_patient_visit', lang)}</h3>
         <div className="text-right">
-          <span className="text-xs text-gray-500">Today</span>
+          <span className="text-xs text-gray-500">{t('today', lang)}</span>
           <p className="text-2xl font-bold text-blue-600">{todayCount}</p>
         </div>
       </div>
@@ -132,7 +136,7 @@ export default function FootfallInputForm({ centreId }: FootfallInputFormProps) 
         {/* Department */}
         <div>
           <label htmlFor="visit-department" className="block text-sm font-medium text-gray-700 mb-1">
-            Department
+            {t('department', lang)}
           </label>
           <select
             id="visit-department"
@@ -140,9 +144,10 @@ export default function FootfallInputForm({ centreId }: FootfallInputFormProps) 
             onChange={(e) => setDepartment(e.target.value as Department)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
+            {DEPARTMENTS.map((d) => {
+              const key: Record<string, string> = { 'General Medicine': 'dept_general_medicine', 'Dental': 'dept_dental', 'Ophthalmology': 'dept_ophthalmology', 'Dermatology': 'dept_dermatology', 'Paediatrics': 'dept_paediatrics', 'Gynaecology/ANC': 'dept_gynaecology', 'Preventive Health Check': 'dept_preventive', 'Emergency': 'dept_emergency' };
+              return <option key={d} value={d}>{t(key[d] || d, lang)}</option>;
+            })}
           </select>
         </div>
 
@@ -150,7 +155,7 @@ export default function FootfallInputForm({ centreId }: FootfallInputFormProps) 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label htmlFor="visit-age" className="block text-sm font-medium text-gray-700 mb-1">
-              Age Group
+              {t('age_group', lang)}
             </label>
             <select
               id="visit-age"
@@ -158,17 +163,20 @@ export default function FootfallInputForm({ centreId }: FootfallInputFormProps) 
               onChange={(e) => setAgeGroup(e.target.value as AgeGroup)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              {AGE_GROUPS.map((a) => (
-                <option key={a} value={a}>{a}</option>
-              ))}
+              {AGE_GROUPS.map((a) => {
+                const key: Record<string, string> = { '0-5 years': 'age_0_5', '6-14 years': 'age_6_14', '15-30 years': 'age_15_30', '31-50 years': 'age_31_50', '51-65 years': 'age_51_65', '65+ years': 'age_65_plus' };
+                return <option key={a} value={a}>{t(key[a] || a, lang)}</option>;
+              })}
             </select>
           </div>
 
           <div>
             <fieldset>
-              <legend className="block text-sm font-medium text-gray-700 mb-1">Gender</legend>
+              <legend className="block text-sm font-medium text-gray-700 mb-1">{t('gender', lang)}</legend>
               <div className="flex gap-3">
-                {GENDERS.map((g) => (
+                {GENDERS.map((g) => {
+                  const key: Record<string, string> = { 'Male': 'gender_male', 'Female': 'gender_female', 'Other': 'gender_other' };
+                  return (
                   <label key={g} className="flex items-center gap-1 cursor-pointer">
                     <input
                       type="radio"
@@ -178,9 +186,10 @@ export default function FootfallInputForm({ centreId }: FootfallInputFormProps) 
                       onChange={(e) => setGender(e.target.value as Gender)}
                       className="text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-700">{g}</span>
+                    <span className="text-sm text-gray-700">{t(key[g] || g, lang)}</span>
                   </label>
-                ))}
+                  );
+                })}
               </div>
             </fieldset>
           </div>
@@ -189,7 +198,7 @@ export default function FootfallInputForm({ centreId }: FootfallInputFormProps) 
         {/* Visit Type */}
         <div>
           <label htmlFor="visit-type" className="block text-sm font-medium text-gray-700 mb-1">
-            Visit Type
+            {t('visit_type', lang)}
           </label>
           <select
             id="visit-type"
@@ -197,9 +206,10 @@ export default function FootfallInputForm({ centreId }: FootfallInputFormProps) 
             onChange={(e) => setVisitType(e.target.value as VisitType)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            {VISIT_TYPES.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
+            {VISIT_TYPES.map((v) => {
+              const key: Record<string, string> = { 'New OPD': 'visit_new_opd', 'Follow-up OPD': 'visit_followup', 'Emergency': 'visit_emergency', 'Lab/Investigation only': 'visit_lab' };
+              return <option key={v} value={v}>{t(key[v] || v, lang)}</option>;
+            })}
           </select>
         </div>
 
@@ -211,7 +221,7 @@ export default function FootfallInputForm({ centreId }: FootfallInputFormProps) 
           className="w-full py-3 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:bg-blue-800 transition-colors"
           aria-busy={isSubmitting}
         >
-          {isSubmitting ? 'Recording...' : '+ Record Visit'}
+          {isSubmitting ? t('recording', lang) : t('record_visit', lang)}
         </button>
 
         {message && (

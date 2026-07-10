@@ -5,6 +5,8 @@ import { ref, onValue, query, orderByChild, limitToLast } from 'firebase/databas
 import { database } from '@/lib/firebase/client';
 import { dbPaths } from '@/lib/firebase/types';
 import { fetchAuditEntries, AuditEntry, AuditCategory } from '@/lib/services/audit';
+import { t } from '@/lib/i18n/translations';
+import { useAuth } from '@/lib/contexts/AuthProvider';
 
 interface AuditLogProps {
   centreId: string;
@@ -54,6 +56,8 @@ function formatTimestamp(ts: number): string {
  * Shows most recent first with category badges and load more support.
  */
 export default function AuditLog({ centreId }: AuditLogProps) {
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -103,7 +107,7 @@ export default function AuditLog({ centreId }: AuditLogProps) {
   if (loading) {
     return (
       <div className="p-4 bg-white rounded-lg shadow" aria-busy="true">
-        <p className="text-gray-500">Loading audit log...</p>
+        <p className="text-gray-500">{t('loading_audit', lang)}</p>
       </div>
     );
   }
@@ -111,14 +115,14 @@ export default function AuditLog({ centreId }: AuditLogProps) {
   if (entries.length === 0) {
     return (
       <div className="p-6 bg-white rounded-lg shadow text-center">
-        <p className="text-gray-500">No audit entries yet. Actions will be logged here.</p>
+        <p className="text-gray-500">{t('no_audit_entries', lang)}</p>
       </div>
     );
   }
 
   return (
     <div className="p-4 bg-white rounded-lg shadow">
-      <h3 className="text-lg font-semibold mb-4">Activity Log</h3>
+      <h3 className="text-lg font-semibold mb-4">{t('activity_log', lang)}</h3>
 
       <div className="space-y-3">
         {entries.map((entry, idx) => {
@@ -152,7 +156,7 @@ export default function AuditLog({ centreId }: AuditLogProps) {
             disabled={loadingMore}
             className="px-4 py-2 text-sm text-blue-600 border border-blue-200 rounded-md hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loadingMore ? 'Loading...' : 'Load more'}
+            {loadingMore ? t('loading', lang) : t('load_more', lang)}
           </button>
         </div>
       )}

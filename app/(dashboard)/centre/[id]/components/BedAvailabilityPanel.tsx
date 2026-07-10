@@ -7,6 +7,8 @@ import { dbPaths } from '@/lib/firebase/types';
 import { validateBedAvailability } from '@/lib/services/validation';
 import { isFullCapacity } from '@/lib/services/alert';
 import { useAuditLog } from '@/lib/hooks/useAuditLog';
+import { t } from '@/lib/i18n/translations';
+import { useAuth } from '@/lib/contexts/AuthProvider';
 
 interface BedAvailabilityPanelProps {
   centreId: string;
@@ -54,6 +56,8 @@ function formatLastUpdated(timestamp: number): string {
  * Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5
  */
 export default function BedAvailabilityPanel({ centreId, readOnly = false }: BedAvailabilityPanelProps) {
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [totalBeds, setTotalBeds] = useState<number>(0);
   const [availableBeds, setAvailableBeds] = useState<number>(0);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
@@ -107,7 +111,7 @@ export default function BedAvailabilityPanel({ centreId, readOnly = false }: Bed
   if (loading) {
     return (
       <div className="p-4 bg-white rounded-lg shadow" aria-busy="true">
-        <p className="text-gray-500">Loading bed availability...</p>
+        <p className="text-gray-500">{t('loading_beds', lang)}</p>
       </div>
     );
   }
@@ -117,23 +121,23 @@ export default function BedAvailabilityPanel({ centreId, readOnly = false }: Bed
   return (
     <div className="p-4 bg-white rounded-lg shadow">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold">Bed Availability</h3>
+        <h3 className="text-lg font-semibold">{t('bed_availability', lang)}</h3>
         {lastUpdated && (
           <span className="text-xs text-gray-400" title={new Date(lastUpdated).toLocaleString()}>
-            Last updated: {formatLastUpdated(lastUpdated)}
+            {t('last_updated', lang)}: {formatLastUpdated(lastUpdated)}
           </span>
         )}
       </div>
 
       <div className="flex gap-6 mb-4">
         <div>
-          <span className="text-sm text-gray-500">Total Beds</span>
+          <span className="text-sm text-gray-500">{t('total_beds', lang)}</span>
           <p className="text-2xl font-bold" data-testid="total-beds">
             {totalBeds}
           </p>
         </div>
         <div>
-          <span className="text-sm text-gray-500">Available Beds</span>
+          <span className="text-sm text-gray-500">{t('available_beds', lang)}</span>
           <p className="text-2xl font-bold" data-testid="available-beds">
             {availableBeds}
           </p>
@@ -146,7 +150,7 @@ export default function BedAvailabilityPanel({ centreId, readOnly = false }: Bed
           role="alert"
           data-testid="full-capacity-alert"
         >
-          <strong>Full Capacity:</strong> No beds available at this centre.
+          <strong>{t('full_capacity', lang)}:</strong> {t('no_beds_available', lang)}
         </div>
       )}
 
@@ -157,7 +161,7 @@ export default function BedAvailabilityPanel({ centreId, readOnly = false }: Bed
               htmlFor="available-beds-input"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Update Available Beds
+              {t('update_available_beds', lang)}
             </label>
             <input
               id="available-beds-input"
@@ -178,7 +182,7 @@ export default function BedAvailabilityPanel({ centreId, readOnly = false }: Bed
             onClick={handleUpdate}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            Update
+            {t('update', lang)}
           </button>
         </div>
       )}

@@ -5,6 +5,8 @@ import { ref, onValue } from 'firebase/database';
 import { database } from '@/lib/firebase/client';
 import { dbPaths } from '@/lib/firebase/types';
 import { getSevenDayChartData } from '@/lib/services/chart-data';
+import { t } from '@/lib/i18n/translations';
+import { useAuth } from '@/lib/contexts/AuthProvider';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -32,6 +34,8 @@ interface FootfallChartProps {
  * Validates: Requirements 4.5
  */
 export default function FootfallChart({ centreId }: FootfallChartProps) {
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const [chartData, setChartData] = useState<{ labels: string[]; data: number[] }>({
     labels: [],
     data: [],
@@ -74,7 +78,7 @@ export default function FootfallChart({ centreId }: FootfallChartProps) {
     labels: chartData.labels,
     datasets: [
       {
-        label: 'Patient Footfall',
+        label: t('patient_footfall', lang),
         data: chartData.data,
         backgroundColor: 'rgba(59, 130, 246, 0.6)',
         borderColor: 'rgba(59, 130, 246, 1)',
@@ -93,7 +97,7 @@ export default function FootfallChart({ centreId }: FootfallChartProps) {
       },
       title: {
         display: true,
-        text: 'Patient Footfall — Last 7 Days',
+        text: t('patient_footfall_last_7', lang),
         font: { size: 14 },
       },
     },
@@ -106,13 +110,13 @@ export default function FootfallChart({ centreId }: FootfallChartProps) {
         },
         title: {
           display: true,
-          text: 'Patients',
+          text: t('patients', lang),
         },
       },
       x: {
         title: {
           display: true,
-          text: 'Date',
+          text: t('date', lang),
         },
       },
     },

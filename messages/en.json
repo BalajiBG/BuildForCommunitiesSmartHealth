@@ -81,5 +81,32 @@
     "metricAttendanceBelow50": "Attendance < 50%",
     "metricBedsAtZero": "Beds at zero",
     "metricFootfallExceedsCapacity": "Footfall exceeds capacity"
+  },
+  "tabs": {
+    "overview": "Overview",
+    "infrastructure": "Infrastructure",
+    "stock": "Medicine Stock",
+    "camps": "Health Camps",
+    "audit": "Audit Log"
+  },
+  "directives": {
+    "activeDirectives": "Active Directives",
+    "completedDirectives": "Completed Directives",
+    "acknowledge": "Acknowledge",
+    "inProgress": "In Progress",
+    "markComplete": "Mark Complete",
+    "addRemarks": "Add Remarks",
+    "issued": "issued",
+    "normal": "NORMAL",
+    "high": "HIGH",
+    "critical": "CRITICAL"
+  },
+  "actions": {
+    "acknowledge": "Acknowledge",
+    "inProgress": "In Progress",
+    "markComplete": "Mark Complete",
+    "addRemarks": "Add Remarks",
+    "issueDirective": "Issue Directive",
+    "raiseIndent": "Raise Indent"
   }
 }

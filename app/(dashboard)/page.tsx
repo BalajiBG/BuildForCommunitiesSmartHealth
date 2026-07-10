@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { database } from '@/lib/firebase/client';
 import { dbPaths } from '@/lib/firebase/types';
 import { useAuth } from '@/lib/contexts/AuthProvider';
+import { t as tStatic } from '@/lib/i18n/translations';
 import { getStockColour } from '@/lib/services/stock-analysis';
 import { aggregateFootfall } from '@/lib/services/aggregation';
 import { isFullCapacity, isUnderstaffed } from '@/lib/services/alert';
@@ -99,11 +100,12 @@ interface SummaryStatsProps {
 }
 
 function SummaryStats({ totalCentres, totalAvailableBeds, totalDoctorsPresent, totalFootfall }: SummaryStatsProps) {
-  const t = useTranslations('dashboard');
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
 
   const stats = [
     {
-      label: 'Total Centres',
+      label: tStatic('total_centres', lang),
       value: totalCentres,
       icon: (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -113,7 +115,7 @@ function SummaryStats({ totalCentres, totalAvailableBeds, totalDoctorsPresent, t
       color: 'text-indigo-600 bg-indigo-50',
     },
     {
-      label: t('summaryBeds'),
+      label: tStatic('beds_available', lang),
       value: totalAvailableBeds,
       icon: (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -123,7 +125,7 @@ function SummaryStats({ totalCentres, totalAvailableBeds, totalDoctorsPresent, t
       color: 'text-emerald-600 bg-emerald-50',
     },
     {
-      label: t('summaryDoctors'),
+      label: tStatic('doctors_present', lang),
       value: totalDoctorsPresent,
       icon: (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -133,7 +135,7 @@ function SummaryStats({ totalCentres, totalAvailableBeds, totalDoctorsPresent, t
       color: 'text-blue-600 bg-blue-50',
     },
     {
-      label: t('summaryFootfall'),
+      label: tStatic('todays_footfall', lang),
       value: totalFootfall,
       icon: (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -171,6 +173,8 @@ interface DetailPanelProps {
 
 function DetailPanel({ metrics, onClose }: DetailPanelProps) {
   const { centre, presentDoctors, footfallCount } = metrics;
+  const { profile } = useAuth();
+  const lang = profile?.languagePreference ?? 'en';
   const bedOccupancy = centre.totalBeds > 0 ? ((centre.totalBeds - centre.availableBeds) / centre.totalBeds) * 100 : 0;
   const doctorAttendance = centre.assignedDoctors > 0 ? (presentDoctors / centre.assignedDoctors) * 100 : 0;
 
@@ -196,9 +200,9 @@ function DetailPanel({ metrics, onClose }: DetailPanelProps) {
       {/* Bed Occupancy */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-sm font-medium text-gray-600">Bed Occupancy</span>
+          <span className="text-sm font-medium text-gray-600">{tStatic('bed_occupancy', lang)}</span>
           <span className="text-sm font-bold text-gray-900">
-            {centre.availableBeds} available / {centre.totalBeds} total
+            {centre.availableBeds} {tStatic('available', lang).toLowerCase()} / {centre.totalBeds} {tStatic('total', lang).toLowerCase()}
           </span>
         </div>
         <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -213,9 +217,9 @@ function DetailPanel({ metrics, onClose }: DetailPanelProps) {
       {/* Doctor Attendance */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-sm font-medium text-gray-600">Doctor Attendance</span>
+          <span className="text-sm font-medium text-gray-600">{tStatic('doctor_attendance', lang)}</span>
           <span className="text-sm font-bold text-gray-900">
-            {presentDoctors} present / {centre.assignedDoctors} assigned
+            {presentDoctors} {tStatic('present', lang).toLowerCase()} / {centre.assignedDoctors} {tStatic('assigned', lang).toLowerCase()}
           </span>
         </div>
         <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -229,7 +233,7 @@ function DetailPanel({ metrics, onClose }: DetailPanelProps) {
 
       {/* Footfall */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <span className="text-sm font-medium text-gray-600">Today&apos;s Footfall</span>
+        <span className="text-sm font-medium text-gray-600">{tStatic('todays_footfall', lang)}</span>
         <p className="text-3xl font-bold text-gray-900 mt-1">{footfallCount}</p>
       </div>
 
@@ -238,7 +242,7 @@ function DetailPanel({ metrics, onClose }: DetailPanelProps) {
         href={`/centre/${centre.id}`}
         className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
       >
-        View Full Details
+        {tStatic('view_full_details', lang)}
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
         </svg>
@@ -252,8 +256,8 @@ function DetailPanel({ metrics, onClose }: DetailPanelProps) {
 function DistrictDashboardContent() {
   const { profile } = useAuth();
   const router = useRouter();
-  const t = useTranslations('dashboard');
   const tEval = useTranslations('evaluation');
+  const lang = profile?.languagePreference ?? 'en';
 
   const [centreIds, setCentreIds] = useState<string[]>([]);
   const [centreMetrics, setCentreMetrics] = useState<Map<string, CentreMetrics>>(new Map());
@@ -518,7 +522,7 @@ function DistrictDashboardContent() {
           <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3H21m-3.75 3H21" />
           </svg>
-          <p className="text-gray-500 text-lg">{t('noData')}</p>
+          <p className="text-gray-500 text-lg">{tStatic('no_data', lang)}</p>
         </div>
       </div>
     );
@@ -527,7 +531,7 @@ function DistrictDashboardContent() {
   return (
     <div className="max-w-7xl mx-auto px-4 lg:px-6 py-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">{t('title')}</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">{tStatic('district_dashboard', lang)}</h1>
       </div>
 
       {/* Alert Banner */}

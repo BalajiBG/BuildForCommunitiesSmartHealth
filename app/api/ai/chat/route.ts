@@ -24,6 +24,7 @@ interface ChatRequestBody {
   districtId: string;
   role?: string;
   centreId?: string | null;
+  language?: 'en' | 'hi';
 }
 
 interface CentreSnapshot {
@@ -672,7 +673,7 @@ function buildNavigationResponse(target: string, isStaff: boolean): string {
 export async function POST(request: Request) {
   try {
     const body: ChatRequestBody = await request.json();
-    const { question, districtId, role, centreId } = body;
+    const { question, districtId, role, centreId, language } = body;
 
     if (!question || !districtId) {
       return NextResponse.json(
@@ -691,6 +692,18 @@ export async function POST(request: Request) {
     const contextData = buildContextString(centres);
 
     // Role-specific prompt addition
+    const langInstruction = language === 'hi'
+      ? '\n\n⚠️ MANDATORY LANGUAGE RULE: You MUST respond ENTIRELY in Hindi (Devanagari script हिंदी में). Do NOT use English at all. Every word of your response must be in Hindi. Medicine names can stay in English but all other text MUST be in Hindi.'
+      : '';
+    
+    const agenticInstruction = `\n\nAGENTIC BEHAVIOR: You are an agentic AI assistant. When you identify an issue:
+1. Proactively suggest the exact action to take
+2. Provide step-by-step navigation to the right page/tab
+3. If a directive needs to be issued, draft the directive content
+4. If stock needs reordering, specify which medicines and quantities
+5. Think ahead — if bed capacity is low, suggest patient diversion BEFORE it becomes critical
+You don't just answer questions — you anticipate problems and propose solutions.`;
+
     const roleContext = isStaff
       ? `\n\nUSER ROLE: Centre Staff at "${centres[0]?.name || 'their centre'}". Only answer about their centre. Give hands-on operational advice (update stock, record attendance, raise indent). Always show their centre's actual numbers.`
       : `\n\nUSER ROLE: District Admin overseeing ${centres.length} centres. Give strategic oversight with per-centre breakdown. Always show actual numbers for each centre.`;
@@ -704,7 +717,7 @@ export async function POST(request: Request) {
       if (!apiKey) throw new Error('No GEMINI_API_KEY env var set');
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const prompt = `${SYSTEM_PROMPT}${roleContext}\n\nCONTEXT DATA:\n${contextData}\n\nUSER QUESTION: ${question}`;
+      const prompt = `${langInstruction}${SYSTEM_PROMPT}${roleContext}${agenticInstruction}\n\nCONTEXT DATA:\n${contextData}\n\nUSER QUESTION: ${question}`;
 
       // Try primary model, then lite model, with retries
       const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
